@@ -114,6 +114,22 @@ function runCreditCardImport() {
       // Amount: statement uses negatives for expenses -> store positive for budgeting totals
       const amountAbs = roundValue(Math.abs(amountRaw));
 
+      // Refunds (positive amounts) should be staged for review
+      if (amountRaw > 0) {
+        rowsToStaging.push(makeRow(mapStaging, {
+          tx_id: txId,
+          date: dateStr,
+          merchant: merchantRaw,
+          amount: amountAbs,
+          rule_mode: "refund",
+          group: "",
+          category: "",
+          posted_at: "",
+          status: STATUS_NEEDS_REVIEW
+        }));
+        continue;
+      }
+
       // tx_id stable across re-runs
       const txId = makeTxId(`${dateStr}|${merchantRaw}|${amountAbs}|credit_card`);
       if (existingTxIds.has(txId)) continue;
