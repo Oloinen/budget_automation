@@ -1,0 +1,61 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: npm test --silent
+
+  e2e:
+    name: E2E (Apps Script)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    if: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: |
+          npm ci || true
+          npm install googleapis --no-audit --no-fund
+      - name: Run E2E runner
+        env:
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+          TEST_SPREADSHEET_ID: ${{ secrets.TEST_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+        run: node test/e2e/run_e2e.js
+      - name: Copy production budget sheet to test copy (optional)
+        if: ${{ secrets.PRODUCTION_BUDGET_DATA_SHEET_ID }}
+        env:
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+          PRODUCTION_BUDGET_DATA_SHEET_ID: ${{ secrets.PRODUCTION_BUDGET_DATA_SHEET_ID }}
+        run: |
+          node test/e2e/copy_sheet.js > copied_id.txt
+          TEST_SPREADSHEET_ID=$(cat copied_id.txt)
+          echo "TEST_SPREADSHEET_ID=$TEST_SPREADSHEET_ID" >> $GITHUB_ENV
+      - name: Run E2E runner (using copied sheet)
+        env:
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+          TEST_SPREADSHEET_ID: ${{ env.TEST_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+          TEST_BUDGET_YEAR: ${{ secrets.TEST_BUDGET_YEAR }}
+        run: node test/e2e/run_e2e.js
