@@ -1,0 +1,11 @@
+{
+  "name": "budget-automation-tests",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  }
+}
