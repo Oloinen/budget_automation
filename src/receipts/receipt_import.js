@@ -37,8 +37,6 @@
  *  - Google Cloud project: Drive API enabled
  ***********************/
 
-/********** CONFIG **********/
-const BUDGET_YEAR = 2026;
 /*
   Parser/rules/ocr/unknowns implementations have been moved into
   src/receipts/{parser,rules,ocr_io,unknowns}.js to keep the main file small.
@@ -92,12 +90,7 @@ function loadItemRules(sheet) {
   return rules;
 }
 
-function findBestRule(itemLower, rules) {
-  for (const r of rules) {
-    if (itemLower.includes(r.pattern)) return r;
-  }
-  return null;
-}
+// Uses shared `findBestRule` from src/utils.js in Node tests and Apps Script.
 
 /********** Receipt parsing **********/
 function splitLines(text) {
@@ -282,3 +275,103 @@ function makeReceiptId(file) {
 /** Sheet plumbing functions are provided by src/utils.js (getTabByName, getHeaders,
  * readColumnValues, appendRows, setIfExists, makeRow, parseAmount, makeTxId, normaliseForMatch, etc.)
  */
+
+// Pure processing helper for receipts: given OCR text (string) and options,
+// return rows to write for `receipt_ready`, `receipt_staging`, and unknown items.
+// `opts` may include: { tz, budgetYear, rules }
+function processReceiptText(text, opts = {}) {
+  const tz = opts.tz || (typeof Session !== 'undefined' && Session.getScriptTimeZone ? Session.getScriptTimeZone() : 'UTC');
+  const BUDGET_YEAR_LOCAL = Number(opts.budgetYear || (typeof BUDGET_YEAR !== 'undefined' ? BUDGET_YEAR : new Date().getFullYear()));
+  const rules = opts.rules || [];
+  const formatDate = opts.formatDate || function(date, tzArg, pattern) {
+    const d = (date instanceof Date) ? date : new Date(date);
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    if (pattern === 'yyyy') return String(yyyy);
+    if (pattern === 'yyyy-MM') return `${yyyy}-${mm}`;
+    if (pattern === 'yyyy-MM-dd') return `${yyyy}-${mm}-${dd}`;
+    return d.toISOString();
+  };
+
+  const lines = splitLines(text);
+  const detectedDate = extractDate(lines, tz);
+  const detectedMerchant = extractMerchant(lines) || '';
+  const receiptId = opts.receiptId || null;
+
+  const parsed = parseReceiptItemLines(lines);
+  const items = parsed.items || [];
+
+  const rowsToReady = [];
+  const rowsToStaging = [];
+  const unknowns = [];
+
+  // If no date found, skip processing
+  if (!detectedDate) return { rowsToReady, rowsToStaging, unknowns, detectedDate, detectedMerchant };
+  const txYear = detectedDate.getUTCFullYear();
+  if (txYear !== BUDGET_YEAR_LOCAL) return { rowsToReady, rowsToStaging, unknowns, detectedDate, detectedMerchant };
+
+  const dateStr = formatDate(detectedDate, tz, 'yyyy-MM-dd');
+  const monthStr = formatDate(detectedDate, tz, 'yyyy-MM');
+
+  // For each item, find best rule
+  for (const it of items) {
+    const nameNorm = normaliseForMatch(it.name);
+    const rule = findBestRule(nameNorm, rules);
+    const amount = round2(it.amount || 0);
+
+    if (!rule) {
+      // push to staging as unknown
+      rowsToStaging.push({
+        receipt_id: receiptId,
+        date: dateStr,
+        merchant: detectedMerchant,
+        line: it.line,
+        amount: amount,
+        rule_mode: 'unknown',
+        proposed_group: '',
+        proposed_category: '',
+        status: STATUS_BLOCKED,
+        posted_at: ''
+      });
+      unknowns.push({ pattern: it.name, date: dateStr });
+      continue;
+    }
+
+    if (rule.mode === 'skip') continue;
+
+    if (rule.mode === 'auto') {
+      rowsToReady.push({
+        tx_id: makeTxId(`${dateStr}|${detectedMerchant}|${amount}|receipt`),
+        date: dateStr,
+        month: monthStr,
+        merchant: detectedMerchant,
+        amount: amount,
+        group: rule.group || '',
+        category: rule.category || '',
+        posted_at: new Date().toISOString(),
+        receipt_id: receiptId,
+        source: 'receipt'
+      });
+    } else {
+      rowsToStaging.push({
+        receipt_id: receiptId,
+        date: dateStr,
+        merchant: detectedMerchant,
+        line: it.line,
+        amount: amount,
+        rule_mode: rule.mode || 'review',
+        proposed_group: rule.group || '',
+        proposed_category: rule.category || '',
+        status: STATUS_NEEDS_REVIEW,
+        posted_at: ''
+      });
+    }
+  }
+
+  return { rowsToReady, rowsToStaging, unknowns, detectedDate, detectedMerchant };
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports = module.exports || {};
+if (typeof module !== 'undefined' && module.exports) module.exports.processReceiptText = processReceiptText;
+

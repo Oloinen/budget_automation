@@ -50,13 +50,13 @@ function setupDailyCcImport0400() {
 function runCreditCardImport() {
   const tz = Session.getScriptTimeZone(); // Europe/Helsinki in project settings
 
-  const budgetData = SpreadsheetApp.openById(DATA_SHEET_ID);
+  const budgetData = SpreadsheetApp.openById(BUDGET_DATA_SHEET_ID);
 
-  const tabRules = getTabByName(budgetData, TAB_RULES);
-  const tabStaging = getTabByName(budgetData, TAB_STAGING);
-  const tabReady = getTabByName(budgetData, TAB_READY);
-  const tabUnknown = getTabByName(budgetData, TAB_UNKNOWN);
-  const tabSkipped = getTabByName(budgetData, TAB_SKIPPED);
+  const tabRules = getTabByName(budgetData, TAB_MERCHANT_RULES);
+  const tabStaging = getTabByName(budgetData, TAB_CC_STAGING);
+  const tabReady = getTabByName(budgetData, TAB_TRANSACTIONS_READY);
+  const tabUnknown = getTabByName(budgetData, TAB_MERCHANTS_UNKNOWN);
+  const tabSkipped = getTabByName(budgetData, TAB_CC_SKIPPED);
 
   const rules = loadMerchantRules(tabRules); // array, longest-first
 
@@ -75,15 +75,12 @@ function runCreditCardImport() {
   // Unknown merchant index (keyed by normalised merchant string)
   const unknownIdx = loadUnknownMerchantsIndex(tabUnknown, mapUnknown);
 
-  const csvFiles = listStatementCsvFiles(STATEMENTS_FOLDER_ID, READ_ONLY_LATEST_CSV);
+  const csvFiles = listStatementCsvFiles(CREDIT_CARD_STATEMENTS_FOLDER_ID, READ_ONLY_LATEST_CSV);
   if (csvFiles.length === 0) return;
 
-  const rowsToStaging = [];
-  const rowsToReady = [];
-  const rowsToSkipped = [];
-
+  const allRecords = [];
   for (const file of csvFiles) {
-    const csvText = file.getBlob().getDataAsString("UTF-8");
+    const csvText = file.getBlob().getDataAsString('UTF-8');
     const { header, records } = parseCsv(csvText);
     if (!header.length) continue;
 
@@ -96,111 +93,178 @@ function runCreditCardImport() {
     }
 
     for (const record of records) {
-      const dateRaw = String(record[iDate] || "").trim();
-      const merchantRaw = String(record[iMerchant] || "").trim();
-      const amountRaw = parseAmount(record[iAmount]);
+      allRecords.push({
+        dateRaw: String(record[iDate] || '').trim(),
+        merchantRaw: String(record[iMerchant] || '').trim(),
+        amountRaw: record[iAmount]
+      });
+    }
+  }
 
-      if (!dateRaw || !merchantRaw || !isFinite(amountRaw)) continue;
+  const result = processCreditCardRecords(allRecords, {
+    tz,
+    budgetYear: BUDGET_YEAR,
+    rules,
+    existingTxIds: Array.from(existingTxIds),
+    findBestRule,
+    makeTxId,
+    parseDate,
+    parseAmount,
+    normaliseForMatch,
+    roundValue
+  });
 
-      const txDate = parseDate(dateRaw);
-      if (!txDate) continue;
+  if (result.rowsToReady && result.rowsToReady.length) {
+    const arr = result.rowsToReady.map(o => makeRow(mapReady, o));
+    appendRows(tabReady, arr);
+  }
 
-      const txYear = Number(Utilities.formatDate(txDate, tz, "yyyy"));
-      if (txYear !== BUDGET_YEAR) continue;
+  if (result.rowsToStaging && result.rowsToStaging.length) {
+    const arr = result.rowsToStaging.map(o => makeRow(mapStaging, o));
+    appendRows(tabStaging, arr);
+  }
 
-      const dateStr = Utilities.formatDate(txDate, tz, "yyyy-MM-dd");
-      const monthStr = Utilities.formatDate(txDate, tz, "yyyy-MM");
+  if (result.rowsToSkipped && result.rowsToSkipped.length) {
+    const arr = result.rowsToSkipped.map(o => makeRow(mapSkipped, o));
+    appendRows(tabSkipped, arr);
+  }
 
-      // Amount: statement uses negatives for expenses -> store positive for budgeting totals
-      const amountAbs = roundValue(Math.abs(amountRaw));
+  // upsert unknown merchants gathered by processor
+  for (const u of (result.unknowns || [])) {
+    upsertUnknownMerchant(unknownIdx, u.key || normaliseForMatch(u.merchant), u.merchant, u.date);
+  }
 
-      // Refunds (positive amounts) should be staged for review
-      if (amountRaw > 0) {
-        rowsToStaging.push(makeRow(mapStaging, {
+  flushUnknownMerchants(tabUnknown, mapUnknown, unknownIdx);
+}
+
+// Pure processing helper: given parsed records, return rows to write.
+// `records` should be array of objects: { dateRaw, merchantRaw, amountRaw }
+// `opts` can override utilities for testing: { tz, budgetYear, rules, existingTxIds, findBestRule, makeTxId, parseDate, parseAmount, normaliseForMatch, makeRow, roundValue }
+function processCreditCardRecords(records, opts = {}) {
+  const tz = opts.tz || (typeof Session !== 'undefined' && Session.getScriptTimeZone ? Session.getScriptTimeZone() : 'UTC');
+  const BUDGET_YEAR_LOCAL = Number(opts.budgetYear || (typeof BUDGET_YEAR !== 'undefined' ? BUDGET_YEAR : new Date().getFullYear()));
+  const rules = opts.rules || [];
+  const existingTxIds = new Set(opts.existingTxIds || []);
+  const findRule = opts.findBestRule || findBestRule;
+  const mkTxId = opts.makeTxId || makeTxId;
+  const pDate = opts.parseDate || parseDate;
+  const pAmount = opts.parseAmount || parseAmount;
+  const norm = opts.normaliseForMatch || normaliseForMatch;
+  const mkRow = opts.makeRow || ((map, obj) => obj);
+  const round = opts.roundValue || (x => Math.round((x + Number.EPSILON) * 100) / 100);
+  const formatDate = opts.formatDate || function(date, tzArg, pattern) {
+    const d = (date instanceof Date) ? date : new Date(date);
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    if (pattern === 'yyyy') return String(yyyy);
+    if (pattern === 'yyyy-MM') return `${yyyy}-${mm}`;
+    if (pattern === 'yyyy-MM-dd') return `${yyyy}-${mm}-${dd}`;
+    return d.toISOString();
+  };
+
+  const rowsToStaging = [];
+  const rowsToReady = [];
+  const rowsToSkipped = [];
+  const unknowns = [];
+
+  for (const r of records) {
+    const dateRaw = String(r.dateRaw || '').trim();
+    const merchantRaw = String(r.merchantRaw || '').trim();
+    const amountRawInput = r.amountRaw;
+    const amountRaw = isFinite(amountRawInput) ? Number(amountRawInput) : pAmount(amountRawInput);
+
+    if (!dateRaw || !merchantRaw || !isFinite(amountRaw)) continue;
+    const txDate = pDate(dateRaw);
+    if (!txDate) continue;
+    const txYear = Number(formatDate(txDate, tz, 'yyyy'));
+    if (txYear !== BUDGET_YEAR_LOCAL) continue;
+    const dateStr = formatDate(txDate, tz, 'yyyy-MM-dd');
+    const monthStr = formatDate(txDate, tz, 'yyyy-MM');
+
+    const amountAbs = round(Math.abs(amountRaw));
+
+    // Refunds (positive amounts) staged
+    if (amountRaw > 0) {
+      rowsToStaging.push({
+        tx_id: null,
+        date: dateStr,
+        merchant: merchantRaw,
+        amount: amountAbs,
+        rule_mode: 'refund',
+        group: '',
+        category: '',
+        posted_at: '',
+        status: STATUS_NEEDS_REVIEW
+      });
+      continue;
+    }
+
+    const txId = mkTxId(`${dateStr}|${merchantRaw}|${amountAbs}|credit_card`);
+    if (existingTxIds.has(txId)) continue;
+    existingTxIds.add(txId);
+
+    const merchantTrimmed = norm(merchantRaw);
+    const merchantRule = findRule(merchantTrimmed, rules);
+    const nowIso = new Date().toISOString();
+    const mode = merchantRule ? merchantRule.mode : 'unknown';
+
+    switch (mode) {
+      case 'skip':
+        rowsToSkipped.push({
           tx_id: txId,
           date: dateStr,
           merchant: merchantRaw,
           amount: amountAbs,
-          rule_mode: "refund",
-          group: "",
-          category: "",
-          posted_at: "",
+          receipt_id: '',
+          verified: false,
+          verified_at: ''
+        });
+        break;
+      case 'auto':
+        rowsToReady.push({
+          tx_id: txId,
+          date: dateStr,
+          month: monthStr,
+          merchant: merchantRaw,
+          amount: amountAbs,
+          group: merchantRule.group || '',
+          category: merchantRule.category || '',
+          posted_at: nowIso,
+          source: 'credit_card'
+        });
+        break;
+      case 'review':
+        rowsToStaging.push({
+          tx_id: txId,
+          date: dateStr,
+          merchant: merchantRaw,
+          amount: amountAbs,
+          rule_mode: 'review',
+          group: merchantRule.group || '',
+          category: merchantRule.category || '',
+          posted_at: '',
           status: STATUS_NEEDS_REVIEW
-        }));
-        continue;
-      }
-
-      // tx_id stable across re-runs
-      const txId = makeTxId(`${dateStr}|${merchantRaw}|${amountAbs}|credit_card`);
-      if (existingTxIds.has(txId)) continue;
-      existingTxIds.add(txId);
-
-      const merchantTrimmed = normaliseForMatch(merchantRaw);
-      const merchantRule = findBestRule(merchantTrimmed, rules);
-
-      const nowIso = new Date().toISOString();
-
-      const mode = merchantRule ? merchantRule.mode : "unknown";
-      switch (mode) {
-        case "skip":
-          rowsToSkipped.push(makeRow(mapSkipped, {
-            tx_id: txId,
-            date: dateStr,
-            merchant: merchantRaw,
-            amount: amountAbs,
-            receipt_id: "",
-            verified: false,
-            verified_at: ""
-          }));
-          break;
-
-        case "auto":
-          rowsToReady.push(makeRow(mapReady, {
-            tx_id: txId,
-            date: dateStr,
-            month: monthStr,
-            merchant: merchantRaw,
-            amount: amountAbs,
-            group: merchantRule.group || "",
-            category: merchantRule.category || "",
-            posted_at: nowIso
-          }));
-          break;
-
-        case "review":
-          rowsToStaging.push(makeRow(mapStaging, {
-            tx_id: txId,
-            date: dateStr,
-            merchant: merchantRaw,
-            amount: amountAbs,
-            rule_mode: "review",
-            group: merchantRule.group || "",
-            category: merchantRule.category || "",
-            posted_at: "",
-            status: STATUS_NEEDS_REVIEW
-          }));
-          break;
-
-        default:
-          rowsToStaging.push(makeRow(mapStaging, {
-            tx_id: txId,
-            date: dateStr,
-            merchant: merchantRaw,
-            amount: amountAbs,
-            rule_mode: "unknown",
-            group: "",
-            category: "",
-            posted_at: "",
-            status: STATUS_BLOCKED
-          }));
-          upsertUnknownMerchant(unknownIdx, merchantTrimmed, merchantRaw, dateStr);
-      }
+        });
+        break;
+      default:
+        rowsToStaging.push({
+          tx_id: txId,
+          date: dateStr,
+          merchant: merchantRaw,
+          amount: amountAbs,
+          rule_mode: 'unknown',
+          group: '',
+          category: '',
+          posted_at: '',
+          status: STATUS_BLOCKED
+        });
+        unknowns.push({ merchant: merchantRaw, key: merchantTrimmed, date: dateStr });
     }
   }
 
-  if (rowsToReady.length) appendRows(tabReady, rowsToReady);
-  if (rowsToStaging.length) appendRows(tabStaging, rowsToStaging);
-  if (rowsToSkipped.length) appendRows(tabSkipped, rowsToSkipped);
-
-  flushUnknownMerchants(tabUnknown, mapUnknown, unknownIdx);
+  return { rowsToReady, rowsToStaging, rowsToSkipped, unknowns, existingTxIds };
 }
+
+if (typeof module !== 'undefined' && module.exports) module.exports = module.exports || {};
+if (typeof module !== 'undefined' && module.exports) module.exports.processCreditCardRecords = processCreditCardRecords;

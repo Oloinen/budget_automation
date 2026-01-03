@@ -1,4 +1,5 @@
-const { parseCsv, parseAmount, normaliseForMatch, roundValue, findBestRule } = require('./helpers');
+const { parseCsv } = require('./helpers');
+const { parseAmount, normaliseForMatch, roundValue } = require('../src/utils');
 
 describe('helpers', () => {
   test('parseCsv basic', () => {
@@ -24,9 +25,5 @@ describe('helpers', () => {
     expect(roundValue(1.234)).toBe(1.23);
   });
 
-  test('findBestRule longest first', () => {
-    const rules = [{pattern: 'a', group:1}, {pattern: 'longest', group:2}];
-    expect(findBestRule('this has longest match', rules).group).toBe(2);
-    expect(findBestRule('contains a', rules).group).toBe(1);
-  });
+  // findBestRule tests moved to test/findBestRule.test.js
 });

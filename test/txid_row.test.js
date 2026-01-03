@@ -1,4 +1,4 @@
-const { makeTxId, makeRow } = require('./helpers');
+const { makeTxId, makeRow } = require('../src/utils');
 
 describe('txId and makeRow', () => {
   test('makeTxId deterministic and length', () => {

@@ -30,9 +30,3 @@ function loadItemRules(sheet) {
   return rules;
 }
 
-function findBestRule(itemLower, rules) {
-  for (const r of rules) {
-    if (itemLower.includes(r.pattern)) return r;
-  }
-  return null;
-}

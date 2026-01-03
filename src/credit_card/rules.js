@@ -29,13 +29,6 @@ function loadMerchantRules(tab) {
   return rules;
 }
 
-function findBestRule(merchantStatementLower, rules) {
-  for (const rule of rules) {
-    if (merchantStatementLower.includes(rule.pattern)) return rule;
-  }
-  return null;
-}
-
 function loadRulesArrayFromRulesSheet() {
   const rulesSs = SpreadsheetApp.openById(RULES_SHEET_ID);
   const sheet = rulesSs.getSheetByName(RULES_TAB_NAME);

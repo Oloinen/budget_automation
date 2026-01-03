@@ -1,5 +1,5 @@
-const TEMPLATE_ID = "17gwasXIteM8dogX3cksuncSVDtLD2hCOfU27GtYCneQ";
-const FOLDER_ID = "1RA1_pbLvpcXl19AdjXjRSmKJVSFAxRQk";
+const TEMPLATE_ID = "";
+const FOLDER_ID = "";
 
 // Optional: enforce the required sheet names
 const REQUIRED_SHEETS = [

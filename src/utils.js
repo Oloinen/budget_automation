@@ -48,7 +48,21 @@ function makeRow(colMap, data) {
 function parseAmount(value) {
   const string = String(value ?? "").trim().replace(/\s+/g, "");
   if (!string) return NaN;
-  return Number(string.replace(",", "."));
+  // Handle both '1 234,56' and '1,234.56' formats:
+  if (string.includes(',') && string.includes('.')) {
+    // Decide which separator is the decimal based on which occurs last.
+    const lastDot = string.lastIndexOf('.');
+    const lastComma = string.lastIndexOf(',');
+    if (lastComma > lastDot) {
+      // comma is decimal, dots are thousand separators: remove dots, replace comma with dot
+      return Number(string.replace(/\./g, '').replace(',', '.'));
+    } else {
+      // dot is decimal, commas are thousand separators: remove commas
+      return Number(string.replace(/,/g, ''));
+    }
+  }
+  if (string.includes(',')) return Number(string.replace(',', '.'));
+  return Number(string);
 }
 
 function parseDate(dateString) {
@@ -67,11 +81,70 @@ function parseDate(dateString) {
 }
 
 function makeTxId(payload) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(payload));
-  return bytes.map(b => ("0" + (b & 0xff).toString(16)).slice(-2)).join("").slice(0, 24);
+  if (typeof Utilities !== 'undefined' && Utilities.computeDigest) {
+    const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(payload));
+    return bytes.map(b => ("0" + (b & 0xff).toString(16)).slice(-2)).join("").slice(0, 24);
+  }
+  // Node fallback
+  try {
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(String(payload)).digest('hex');
+    return String(hash).slice(0, 24);
+  } catch (e) {
+    // Last-resort: simple hex of utf8 payload
+    return Buffer.from(String(payload), 'utf8').toString('hex').slice(0, 24);
+  }
 }
 
 function normaliseForMatch(string) {
   // Keep hyphens. Just lowercase + collapse spaces.
   return String(string || "").toLowerCase().trim().replace(/\s+/g, " ");
 }
+
+function roundValue(v) {
+    return Math.round((v + Number.EPSILON) * 100) / 100;
+  }
+
+  function findBestRule(needle, rules) {
+    if (!rules || rules.length === 0) return null;
+    const n = String(needle || '');
+    const matches = [];
+    for (const r of rules) {
+      if (!r || !r.pattern) continue;
+      const p = String(r.pattern);
+      if (p && n.includes(p)) matches.push(r);
+    }
+    if (matches.length === 1) return matches[0];
+    return null;
+  }
+
+  function setTestGlobals(overrides = {}) {
+    try {
+      const g = (typeof global !== 'undefined') ? global : (typeof globalThis !== 'undefined' ? globalThis : null);
+      if (!g) return;
+      for (const k of Object.keys(overrides)) {
+        try { g[k] = overrides[k]; } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      // noop
+    }
+  }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getTabByName,
+    getHeaders,
+    readColumnValues,
+    appendRows,
+    setIfExists,
+    makeRow,
+    parseAmount,
+    parseDate,
+    makeTxId,
+    roundValue,
+    findBestRule,
+    normaliseForMatch
+  };
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports.setTestGlobals = setTestGlobals;
