@@ -69,14 +69,6 @@
           "amount": {
             "type": ["number", "null"],
             "description": "Item price (null if not detected)."
-          },
-          "quantity": {
-            "type": ["number", "null"],
-            "description": "Quantity if detected (optional)."
-          },
-          "unit_price": {
-            "type": ["number", "null"],
-            "description": "Unit price if quantity is present (optional)."
           }
         }
       }

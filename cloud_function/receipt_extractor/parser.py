@@ -130,9 +130,7 @@ def extract_items(lines):
                 if len(name) >= 3 and amount > 0:
                     items.append({
                         "name": name,
-                        "amount": amount,
-                        "quantity": None,
-                        "unit_price": None
+                        "amount": amount
                     })
                 
                 i += 2  # Skip both current and next line
@@ -155,9 +153,7 @@ def extract_items(lines):
                 if len(name) >= 3:
                     items.append({
                         "name": name,
-                        "amount": amount,
-                        "quantity": None,
-                        "unit_price": None
+                        "amount": amount
                     })
         
         i += 1
