@@ -56,19 +56,41 @@ receipt_extractor/
 
 1. **Create virtual environment**:
    ```bash
+   cd cloud_function/receipt_extractor
    python3 -m venv .venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
 2. **Install dependencies**:
    ```bash
+   # Install production dependencies
    pip install -r requirements.txt
-   pip install pytest  # For testing
+   
+   # Install development dependencies (includes pytest)
+   pip install -r requirements-dev.txt
    ```
 
 3. **Configure Python environment** (if using VS Code):
    - Select interpreter: `.venv/bin/python`
    - Pylance will handle imports automatically
+
+### Virtual Environment for Testing
+
+The virtual environment is required for running tests locally. If you don't have it set up:
+
+```bash
+# Create and activate venv
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install all dependencies
+pip install -r requirements-dev.txt
+
+# Verify installation
+pytest --version
+```
+
+The `.venv` directory is git-ignored and should not be committed.
 
 ## Testing
 
@@ -126,7 +148,7 @@ pytest tests/integration/ -v
 - End-to-end parsing of OCR results
 - Vision API response handling
 
-**Note**: Integration tests are automatically skipped if `GOOGLE_APPLICATION_CREDENTIALS` is not set.
+**Note**: Integration tests are automatically skipped if user is not authenticated
 
 ### Run All Tests
 

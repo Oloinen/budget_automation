@@ -1,0 +1,56 @@
+# Local configuration
+/apps_script/src/config.local.js
+plan.txt
+
+# Node dependencies
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Testing
+.pytest_cache/
+coverage/
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+
+# IDEs and editors
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.clasp.json.backup
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Credentials and keys
+*.json.key
+*credentials*.json
+service-account*.json
+
+# Temporary files
+*.tmp
+.tmp/
+

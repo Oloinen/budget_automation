@@ -7,7 +7,11 @@ from googleapiclient.http import MediaIoBaseDownload
 import fitz  # PyMuPDF
 from google.cloud import vision
 
-from .parser import parse_receipt_text_
+# Support both relative imports (for tests) and absolute imports (for Cloud Functions)
+try:
+    from .parser import parse_receipt_text_
+except ImportError:
+    from parser import parse_receipt_text_
 
 # Tune these based on your receipts
 MIN_TEXT_CHARS_FOR_TEXT_PDF = 200
