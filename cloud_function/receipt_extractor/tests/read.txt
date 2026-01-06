@@ -1,0 +1,6 @@
+How to test
+
+cd cloud_function/receipt_extractor
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt

@@ -14,7 +14,14 @@ MIN_TEXT_CHARS_FOR_TEXT_PDF = 200
 MAX_OCR_PAGES = 3          # receipts are usually 1, sometimes 2
 OCR_DPI = 200              # 200–300 is fine; 300 increases cost/latency
 
-vision_client = vision.ImageAnnotatorClient()
+_vision_client = None
+
+def get_vision_client():
+    """Lazy-initialize Vision client to avoid auth errors during imports."""
+    global _vision_client
+    if _vision_client is None:
+        _vision_client = vision.ImageAnnotatorClient()
+    return _vision_client
 
 def process_drive_file(file_id: str) -> dict:
     creds, _ = google.auth.default()
@@ -117,7 +124,7 @@ def ocr_scanned_pdf_bytes_(pdf_bytes: bytes, warnings=None) -> str:
 
 def ocr_image_bytes_(img_bytes: bytes) -> str:
     image = vision.Image(content=img_bytes)
-    resp = vision_client.text_detection(image=image, image_context={"language_hints": ["fi", "en"]})
+    resp = get_vision_client().text_detection(image=image, image_context={"language_hints": ["fi", "en"]})
     if resp.error and resp.error.message:
         raise RuntimeError(f"Vision OCR error: {resp.error.message}")
     return resp.full_text_annotation.text or ""
