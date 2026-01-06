@@ -1,11 +1,16 @@
 {
   "name": "budget-automation-tests",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "scripts": {
     "test": "jest"
   },
   "devDependencies": {
     "jest": "^29.0.0"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.88",
+    "pdfjs-dist": "^5.4.530"
   }
 }
