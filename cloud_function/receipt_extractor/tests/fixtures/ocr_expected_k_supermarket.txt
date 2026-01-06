@@ -1,26 +1,26 @@
-K-Supermarket Kamppi Urho Kekkosen katu 1 A 24 00100 Helsinki 
-P. 09252-6060 Y-1731549-8 jouni.tuominen@k-supermarket.fi 
-K021 M026356/0554 15.24 
-15.24 31.12.2025 
-Wotkins Henalan salami 100g 
-3,95 
-Nongshim pikanuudeli 120g shin 
-5,18 
-2 KPL 
-2,59 €/KPL 
-Candyking irtomakeinen 
-0,95 
-- 0,068 KG 
-13,95 €/KG 
-Fanta Sitruuna Zero 0,51 
-2,19 
-Pullopantti KMP 0,20 0,35L-1L 
-0,20 
-YHTEENSÄ 
-12,47 
-KANTA-ASIAKAS 
-KORTTI: 7674 
-PLUSSAA KERRYTTÄVÄT OSTOT 
-12,47 
-CARD TRANSACTION 
-Card: 
+K-Supermarket Kamppi
+Urho Kekkosen katu 1 A 24
+00100 Helsinki
+p. 09252 6060 Y-1731549-8
+jouni.tuominen@k-supermarket.fi
+K021 M026356/0554 15.24 31.12.2025
+Wotkins Henalan salami 100g
+3,95
+Nongshim pikanuudeli 120g shin
+5,18
+2 KPL 2,59 €/KPL
+Candyking irtomakeinen
+0,95
+0,068 KG
+13,95 €/KG
+Fanta Sitruuna Zero 0,51
+2,19
+Pullopantti KMP 0,20 0,35L-1L
+0,20
+YHTEENSÄ
+12,47
+KANTA-ASIAKAS
+KORTTI: 7674
+PLUSSAA KERRYTTÄVÄT OSTOT
+12,47
+CARD TRANSACTION

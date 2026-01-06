@@ -101,12 +101,20 @@ pytest tests/unit/ --cov=. --cov-report=html
 Integration tests require Google Cloud credentials and make real API calls to Vision API.
 
 **Prerequisites**:
-1. Set up Google Cloud service account with Vision API access
-2. Download credentials JSON file
-3. Set environment variable:
+1. Authenticate with Google Cloud:
    ```bash
-   export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+   gcloud auth login
+   gcloud auth application-default login
    ```
+
+2. Verify credentials are working:
+   ```bash
+   gcloud auth application-default print-access-token >/dev/null && echo OK
+   ```
+
+3. Ensure your user account has:
+   - Access to the Drive folder/files used in tests
+   - Permission to call Vision API (or is in a project that has it enabled)
 
 **Run integration tests**:
 ```bash

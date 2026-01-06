@@ -1,25 +1,29 @@
-K-market Töölöntori Tykistönkatu 7, 00260 Helsinki Puh. (09) 4342630 
-Y-tunnus: 3454352-1 
-18.37 1.1.2026 
-K002 M062265/8023 
-Fanta Sitruuna Zero 0,51 
-2.19 
-Pullopantti KMP 0,20 0,35L-1L 
-0,20 
-Classic jäätelö 80g kerrossukl 
-2.38 
-Cornichos pikku kurkut 350/190 
-7.25 
-Fanta Sitruuna Zero 1,51 
-2.59 
-Pullopantti KMP 0,40 
-0.40 
-YHTEENSÄ 
-15.01 
-KANTA-ASIAKAS 
-KORTTI: 7674 
-PLUSSAA KERRYTTÄVÄT OSTOT 
-15.01 
-CARD TRANSACTION 
-Card: 
-Visa Credit 
+K-market Töölöntori
+Tykistönkatu 7, 00260 Helsinki
+Puh. (09) 4342630
+Y-tunnus: 3454352-1
+K002 M062265/8023 18.37
+1.1.2026
+Fanta Sitruuna Zero 0,51
+2,19
+Pullopantti KMP 0,20 0,35L-1L
+0,20
+Classic jäätelö 80g kerrossuki
+2.38
+Cornichos pikku kurkut 350/190
+7,25
+Fanta Sitruuna Zero 1,51
+2.59
+Pullopantti KMP 0,40
+0.40
+YHTEENSÄ
+15,01
+KANTA-ASIAKAS
+KORTTI: 7674
+PLUSSAA KERRYTTÄVÄT OSTOT
+15.01
+CARD TRANSACTION
+Card:
+Applic
+Tr.Nr/Auth:
+Visa Credit

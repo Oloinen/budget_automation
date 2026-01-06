@@ -33,7 +33,7 @@ def extract_merchant(lines):
             merchant = re.sub(r',?\s*\d{5}\s+[A-ZÅÄÖa-zåäö\s]+$', '', merchant)
             return merchant.strip()
         if l.isupper() and len(l) > 5:
-            # Clean up uppercase merchant names too
+            # Clean up uppercase merchant names
             merchant = l
             merchant = re.sub(r'\s*Puh\.?\s*\(?\d+\)?[\s\d\-]+', '', merchant, flags=re.IGNORECASE)
             merchant = re.sub(r'\s*Tel\.?\s*\(?\d+\)?[\s\d\-]+', '', merchant, flags=re.IGNORECASE)
@@ -116,7 +116,7 @@ def extract_items(lines):
                 
                 # Remove volume/size indicators like "0,35L-1L" (OCR artifacts)
                 name = re.sub(r'\s+\d+[.,]\d+L[^\s]*', '', name, flags=re.IGNORECASE)
-                # Remove trailing decimal amounts like "0,51" or "1,51" or "0,20" (misread volumes)
+                # Remove trailing decimal amounts like "0,51" or "1,51" or "0,20" (misread volumes for bottled drinks)
                 name = re.sub(r'\s+\d+[.,]\d{1,2}$', '', name)
                 name = name.strip()
                 
