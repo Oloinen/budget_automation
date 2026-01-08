@@ -1,3 +1,4 @@
+/* exported approveUnknownMerchants */
 /**
  * Unknown Merchants Approval Script (Apps Script)
  *
@@ -21,11 +22,11 @@
 /**
  * Entry point: processes unknown_merchants entries with manual categorization.
  * Safe to run multiple times - only processes entries with status NEEDS_REVIEW.
- * 
+ *
  * @param {string} testSpreadsheetId - Optional spreadsheet ID for E2E testing
  */
 function approveUnknownMerchants(testSpreadsheetId) {
-  const ss = testSpreadsheetId 
+  const ss = testSpreadsheetId
     ? SpreadsheetApp.openById(testSpreadsheetId)
     : SpreadsheetApp.getActive();
 
@@ -34,7 +35,9 @@ function approveUnknownMerchants(testSpreadsheetId) {
   const categoriesSheet = ss.getSheetByName(TAB_CATEGORIES);
 
   if (!unknownSheet || !rulesSheet || !categoriesSheet) {
-    console.log("Missing required sheets. Ensure unknown_merchants, merchant_rules, and categories exist.");
+    Logger.log(
+      "Missing required sheets. Ensure unknown_merchants, merchant_rules, and categories exist.",
+    );
     return;
   }
 
@@ -47,11 +50,11 @@ function approveUnknownMerchants(testSpreadsheetId) {
   // Get unknown_merchants data
   const unknownData = unknownSheet.getDataRange().getValues();
   if (unknownData.length < 2) {
-    console.log("No unknown merchants to process.");
+    Logger.log("No unknown merchants to process.");
     return;
   }
 
-  const headers = unknownData[0].map(h => String(h).trim().toLowerCase());
+  const headers = unknownData[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iMerchant = colIndex("merchant");
@@ -92,7 +95,7 @@ function approveUnknownMerchants(testSpreadsheetId) {
     if (existingMerchants.has(merchantNormalized)) {
       unknownSheet.getRange(rowNum, iStatus + 1).setValue(STATUS_ERROR);
       errors++;
-      console.log(`Row ${rowNum}: Merchant rule already exists: "${merchant}"`);
+      Logger.log(`Row ${rowNum}: Merchant rule already exists: "${merchant}"`);
       continue;
     }
 
@@ -100,7 +103,9 @@ function approveUnknownMerchants(testSpreadsheetId) {
     if (mode !== MODE_AUTO && mode !== MODE_REVIEW && mode !== MODE_SKIP) {
       unknownSheet.getRange(rowNum, iStatus + 1).setValue(STATUS_ERROR);
       errors++;
-      console.log(`Row ${rowNum}: Invalid mode: "${mode}". Must be "${MODE_AUTO}", "${MODE_REVIEW}", or "${MODE_SKIP}"`);
+      Logger.log(
+        `Row ${rowNum}: Invalid mode: "${mode}". Must be "${MODE_AUTO}", "${MODE_REVIEW}", or "${MODE_SKIP}"`,
+      );
       continue;
     }
 
@@ -110,7 +115,7 @@ function approveUnknownMerchants(testSpreadsheetId) {
       if (!group || !category) {
         unknownSheet.getRange(rowNum, iStatus + 1).setValue(STATUS_ERROR);
         errors++;
-        console.log(`Row ${rowNum}: Group and category required for mode "${mode}"`);
+        Logger.log(`Row ${rowNum}: Group and category required for mode "${mode}"`);
         continue;
       }
 
@@ -120,7 +125,7 @@ function approveUnknownMerchants(testSpreadsheetId) {
         // Invalid category/group combination
         unknownSheet.getRange(rowNum, iStatus + 1).setValue(STATUS_ERROR);
         errors++;
-        console.log(`Row ${rowNum}: Invalid group/category: "${group}" / "${category}"`);
+        Logger.log(`Row ${rowNum}: Invalid group/category: "${group}" / "${category}"`);
         continue;
       }
 
@@ -128,20 +133,10 @@ function approveUnknownMerchants(testSpreadsheetId) {
       const canonical = validCategories.get(normalizedKey);
 
       // Create merchant_rules row with canonical names
-      rulesSheet.appendRow([
-        merchant,
-        canonical.group,
-        canonical.category,
-        mode
-      ]);
+      rulesSheet.appendRow([merchant, canonical.group, canonical.category, mode]);
     } else {
       // For skip mode, use provided group/category (can be empty)
-      rulesSheet.appendRow([
-        merchant,
-        group,
-        category,
-        mode
-      ]);
+      rulesSheet.appendRow([merchant, group, category, mode]);
     }
 
     // Mark as approved
@@ -150,7 +145,7 @@ function approveUnknownMerchants(testSpreadsheetId) {
     approved++;
   }
 
-  console.log(`Approved ${approved} merchants, ${errors} errors, ${skipped} skipped.`);
+  Logger.log(`Approved ${approved} merchants, ${errors} errors, ${skipped} skipped.`);
 }
 
 /**
@@ -162,7 +157,7 @@ function loadValidCategoriesForUnknown(categoriesSheet) {
   const data = categoriesSheet.getDataRange().getValues();
   if (data.length < 2) return new Map();
 
-  const headers = data[0].map(h => String(h).trim().toLowerCase());
+  const headers = data[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iGroup = colIndex("group");
@@ -203,7 +198,7 @@ function loadExistingMerchants(rulesSheet) {
   const data = rulesSheet.getDataRange().getValues();
   if (data.length < 2) return new Set();
 
-  const headers = data[0].map(h => String(h).trim().toLowerCase());
+  const headers = data[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iMerchant = colIndex("merchant");

@@ -1,8 +1,8 @@
 function makeMockAdapter(initialValues = {}) {
   let config = null;
-  if (typeof require === 'function') {
+  if (typeof require === "function") {
     try {
-      config = require('../../src/config');
+      config = require("../../src/config");
     } catch (e) {
       config = null;
     }

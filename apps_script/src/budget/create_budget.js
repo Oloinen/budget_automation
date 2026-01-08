@@ -1,3 +1,4 @@
+/* exported onOpen, createBudgetPrompt, createBudgetForYear */
 const TEMPLATE_ID = "";
 const FOLDER_ID = "";
 
@@ -70,8 +71,8 @@ function createBudgetForYear(year) {
 }
 
 function assertTemplateLooksRight(ss) {
-  const names = ss.getSheets().map(s => s.getName());
-  const missing = REQUIRED_SHEETS.filter(n => !names.includes(n));
+  const names = ss.getSheets().map((s) => s.getName());
+  const missing = REQUIRED_SHEETS.filter((n) => !names.includes(n));
   if (missing.length) {
     throw new Error(`Template is missing required sheets: ${missing.join(", ")}`);
   }
@@ -84,7 +85,7 @@ function populatePlannedBudget(ss) {
   const values = categoriesSheet.getDataRange().getValues();
   if (values.length < 2) return;
 
-  const headers = values[0].map(h => String(h).trim().toLowerCase());
+  const headers = values[0].map((h) => String(h).trim().toLowerCase());
   const idx = (name) => headers.indexOf(name);
 
   const iGroup = idx("group");
@@ -92,20 +93,29 @@ function populatePlannedBudget(ss) {
   const iSub = idx("subcategory");
   const iActive = idx("active");
 
-  if ([iGroup, iCategory, iSub, iActive].some(i => i === -1)) {
+  if ([iGroup, iCategory, iSub, iActive].some((i) => i === -1)) {
     throw new Error("Categories sheet must have headers: group, category, subcategory, active");
   }
 
   const rows = values
     .slice(1)
-    .filter(r => r[iActive] === true)
-    .map(r => ([
+    .filter((r) => r[iActive] === true)
+    .map((r) => [
       r[iGroup] || "",
       r[iCategory] || "",
       r[iSub] || "",
-      "", "", "", "", "", "", "", "", "", "", // Jan-Dec (12)
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "", // Jan-Dec (12)
       "", // yearly
-    ]));
+    ]);
 
   // Clear old rows (keep header row)
   const lastRow = budgetSheet.getLastRow();

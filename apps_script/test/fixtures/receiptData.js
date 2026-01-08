@@ -4,9 +4,9 @@
  * This file contains mock objects with methods (receiptFiles)
  */
 
-const itemRules = require('./itemRules.json');
-const expectedRows = require('./expectedRows.json');
-const receiptItems = require('./receiptItems.json');
+const itemRules = require("./itemRules.json");
+const expectedRows = require("./expectedRows.json");
+const receiptItems = require("./receiptItems.json");
 
 /**
  * Sample file data for mock Drive files
@@ -16,26 +16,26 @@ const receiptFiles = {
   pdf: {
     getId: () => "pdf-file-123",
     getName: () => "receipt_20260105.pdf",
-    getMimeType: () => "application/pdf"
+    getMimeType: () => "application/pdf",
   },
-  
+
   jpg: {
     getId: () => "jpg-file-456",
     getName: () => "receipt_20260106.jpg",
-    getMimeType: () => "image/jpeg"
+    getMimeType: () => "image/jpeg",
   },
-  
+
   png: {
     getId: () => "png-file-789",
     getName: () => "receipt_20260107.png",
-    getMimeType: () => "image/png"
+    getMimeType: () => "image/png",
   },
-  
+
   unsupported: {
     getId: () => "txt-file-000",
     getName: () => "notes.txt",
-    getMimeType: () => "text/plain"
-  }
+    getMimeType: () => "text/plain",
+  },
 };
 
 /**
@@ -45,7 +45,7 @@ const cursorStates = {
   initial: null,
   midProcess: "receipt2.jpg",
   almostDone: "receipt9.pdf",
-  complete: "zzz_last_file.pdf"
+  complete: "zzz_last_file.pdf",
 };
 
 module.exports = {
@@ -53,5 +53,5 @@ module.exports = {
   receiptFiles,
   expectedRows,
   receiptItems,
-  cursorStates
+  cursorStates,
 };

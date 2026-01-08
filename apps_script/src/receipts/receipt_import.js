@@ -1,3 +1,4 @@
+/* exported importReceiptsFromFolder */
 /**
  * Receipt importer (Apps Script)
  *
@@ -36,9 +37,7 @@ function importReceiptsFromFolder() {
   const rules = loadRules(sheets.rulesSheet, "pattern");
 
   // Idempotency: load existing file_ids to avoid reprocessing
-  const existingFileIds = new Set(
-    readColumnValues(sheets.filesSheet, "file_id").filter(Boolean)
-  );
+  const existingFileIds = new Set(readColumnValues(sheets.filesSheet, "file_id").filter(Boolean));
 
   // Load unknown items index for batch upsert
   const unknownItemsMap = getHeaders(sheets.unknownSheet);
@@ -65,7 +64,9 @@ function importReceiptsFromFolder() {
     // Skip non-supported types quickly
     const mt = file.getMimeType() || "";
     const isPdf = mt === "application/pdf";
-    const isImage = mt.startsWith("image/") && (/\.(jpe?g|png)$/i.test(name) || mt.includes("jpeg") || mt.includes("png"));
+    const isImage =
+      mt.startsWith("image/") &&
+      (/\.(jpe?g|png)$/i.test(name) || mt.includes("jpeg") || mt.includes("png"));
 
     if (!isPdf && !isImage) {
       // ignore other files
@@ -105,12 +106,21 @@ function importReceiptsFromFolder() {
         detectedMerchant,
         detectedAmount,
         false,
-        ""
+        "",
       ]);
 
       // Process each item: match rules and categorize
-      processReceiptItems(sheets, items, detectedDate, detectedMerchant, receiptId, rawText, importedAtIso, rules, unknownItemsIdx);
-
+      processReceiptItems(
+        sheets,
+        items,
+        detectedDate,
+        detectedMerchant,
+        receiptId,
+        rawText,
+        importedAtIso,
+        rules,
+        unknownItemsIdx,
+      );
     } catch (err) {
       // Write receipt_files row with error status
       appendRow(sheets.filesSheet, [
@@ -123,7 +133,7 @@ function importReceiptsFromFolder() {
         "",
         "",
         false,
-        String(err && err.message ? err.message : err)
+        String(err && err.message ? err.message : err),
       ]);
     }
   }
@@ -131,13 +141,23 @@ function importReceiptsFromFolder() {
   // Flush unknown items index (batch write)
   flushUnknownItems(sheets.unknownSheet, unknownItemsMap, unknownItemsIdx);
 
-  console.log(`Processed ${processed} files this run.`);
+  Logger.log(`Processed ${processed} files this run.`);
 }
 
 /* ---------------------------
  * Process receipt items
  * --------------------------- */
-function processReceiptItems(sheets, items, detectedDate, detectedMerchant, receiptId, rawText, importedAtIso, rules, unknownItemsIdx) {
+function processReceiptItems(
+  sheets,
+  items,
+  detectedDate,
+  detectedMerchant,
+  receiptId,
+  rawText,
+  importedAtIso,
+  rules,
+  unknownItemsIdx,
+) {
   for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
     const item = items[itemIdx];
     const itemName = String(item?.name || "").trim();
@@ -150,7 +170,7 @@ function processReceiptItems(sheets, items, detectedDate, detectedMerchant, rece
     if (match) {
       const txId = makeTxId(`${detectedDate}|${itemName}|${itemAmount}|${receiptId}|${itemIdx}`);
       const month = toMonth(detectedDate);
-      
+
       // Check mode: 'review' goes to staging, 'auto' goes to ready
       if (match.mode === MODE_REVIEW) {
         // matched but needs review -> receipt_staging
@@ -164,7 +184,7 @@ function processReceiptItems(sheets, items, detectedDate, detectedMerchant, rece
           match.category,
           importedAtIso,
           STATUS_NEEDS_REVIEW,
-          truncate(rawText, RAW_TEXT_MAX_LENGTH)
+          truncate(rawText, RAW_TEXT_MAX_LENGTH),
         ]);
       } else {
         // matched with auto mode -> transactions_ready
@@ -177,7 +197,7 @@ function processReceiptItems(sheets, items, detectedDate, detectedMerchant, rece
           match.group,
           match.category,
           importedAtIso,
-          `receipt:${receiptId}`
+          `receipt:${receiptId}`,
         ]);
       }
     } else {
@@ -193,7 +213,7 @@ function processReceiptItems(sheets, items, detectedDate, detectedMerchant, rece
         "",
         importedAtIso,
         STATUS_NEEDS_RULE,
-        truncate(rawText, RAW_TEXT_MAX_LENGTH)
+        truncate(rawText, RAW_TEXT_MAX_LENGTH),
       ]);
 
       // Upsert to unknown items index (batch update)
@@ -208,35 +228,35 @@ function processReceiptItems(sheets, items, detectedDate, detectedMerchant, rece
  * --------------------------- */
 function callReceiptExtractor(fileId) {
   const url = RECEIPT_EXTRACTOR_URL;
-  
+
   // Get identity token for authentication
   const token = ScriptApp.getIdentityToken();
-  
+
   const payload = { fileId };
-  
+
   const res = UrlFetchApp.fetch(url, {
     method: "post",
     contentType: "application/json",
     headers: {
-      "Authorization": `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
     payload: JSON.stringify(payload),
-    muteHttpExceptions: true
+    muteHttpExceptions: true,
   });
-  
+
   const code = res.getResponseCode();
   const body = res.getContentText();
-  
+
   if (code < 200 || code >= 300) {
     throw new Error(`Receipt extractor error HTTP ${code}: ${body.substring(0, 1000)}`);
   }
-  
+
   const json = JSON.parse(body);
-  
+
   if (!json.ok) {
     throw new Error(`Receipt extractor returned error: ${json.error || "unknown error"}`);
   }
-  
+
   return json.result;
 }
 

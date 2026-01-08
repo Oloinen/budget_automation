@@ -20,7 +20,10 @@ function readColumnValues(tab, headerName) {
   if (!col) return [];
   const lastRow = tab.getLastRow();
   if (lastRow < 2) return [];
-  return tab.getRange(2, col, lastRow - 1, 1).getValues().flat();
+  return tab
+    .getRange(2, col, lastRow - 1, 1)
+    .getValues()
+    .flat();
 }
 
 function appendRows(tab, rows) {
@@ -46,22 +49,24 @@ function makeRow(colMap, data) {
 }
 
 function parseAmount(value) {
-  const string = String(value ?? "").trim().replace(/\s+/g, "");
+  const string = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, "");
   if (!string) return NaN;
   // Handle both '1 234,56' and '1,234.56' formats:
-  if (string.includes(',') && string.includes('.')) {
+  if (string.includes(",") && string.includes(".")) {
     // Decide which separator is the decimal based on which occurs last.
-    const lastDot = string.lastIndexOf('.');
-    const lastComma = string.lastIndexOf(',');
+    const lastDot = string.lastIndexOf(".");
+    const lastComma = string.lastIndexOf(",");
     if (lastComma > lastDot) {
       // comma is decimal, dots are thousand separators: remove dots, replace comma with dot
-      return Number(string.replace(/\./g, '').replace(',', '.'));
+      return Number(string.replace(/\./g, "").replace(",", "."));
     } else {
       // dot is decimal, commas are thousand separators: remove commas
-      return Number(string.replace(/,/g, ''));
+      return Number(string.replace(/,/g, ""));
     }
   }
-  if (string.includes(',')) return Number(string.replace(',', '.'));
+  if (string.includes(",")) return Number(string.replace(",", "."));
   return Number(string);
 }
 
@@ -69,7 +74,7 @@ function parseDate(dateString) {
   const string = String(dateString).trim();
 
   // YYYY-MM-DD or YYYY/MM/DD
-  let m = string.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  let m = string.match(new RegExp("^(\\d{4})[-/](\\d{1,2})[-/](\\d{1,2})$"));
   if (m) return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
 
   // DD.MM.YYYY
@@ -81,54 +86,69 @@ function parseDate(dateString) {
 }
 
 function makeTxId(payload) {
-  if (typeof Utilities !== 'undefined' && Utilities.computeDigest) {
+  if (typeof Utilities !== "undefined" && Utilities.computeDigest) {
     const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(payload));
-    return bytes.map(b => ("0" + (b & 0xff).toString(16)).slice(-2)).join("").slice(0, 24);
+    return bytes
+      .map((b) => ("0" + (b & 0xff).toString(16)).slice(-2))
+      .join("")
+      .slice(0, 24);
   }
   // Node fallback
   try {
-    const crypto = require('crypto');
-    const hash = crypto.createHash('sha256').update(String(payload)).digest('hex');
+    const crypto = require("crypto");
+    const hash = crypto.createHash("sha256").update(String(payload)).digest("hex");
     return String(hash).slice(0, 24);
   } catch (e) {
     // Last-resort: simple hex of utf8 payload
-    return Buffer.from(String(payload), 'utf8').toString('hex').slice(0, 24);
+    return Buffer.from(String(payload), "utf8").toString("hex").slice(0, 24);
   }
 }
 
 function normaliseForMatch(string) {
   // Keep hyphens. Just lowercase + collapse spaces.
-  return String(string || "").toLowerCase().trim().replace(/\s+/g, " ");
+  return String(string || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
 }
 
 function roundValue(v) {
-    return Math.round((v + Number.EPSILON) * 100) / 100;
-  }
+  return Math.round((v + Number.EPSILON) * 100) / 100;
+}
 
-  function findBestRule(needle, rules) {
-    if (!rules || rules.length === 0) return null;
-    const n = String(needle || '');
-    const matches = [];
-    for (const r of rules) {
-      if (!r || !r.pattern) continue;
-      const p = String(r.pattern);
-      if (p && n.includes(p)) matches.push(r);
-    }
-    if (matches.length === 1) return matches[0];
-    return null;
+function findBestRule(needle, rules) {
+  if (!rules || rules.length === 0) return null;
+  const n = String(needle || "");
+  const matches = [];
+  for (const r of rules) {
+    if (!r || !r.pattern) continue;
+    const p = String(r.pattern);
+    if (p && n.includes(p)) matches.push(r);
   }
+  if (matches.length === 1) return matches[0];
+  return null;
+}
 
-  function setTestGlobals(overrides = {}) {
-    try {
-      const g = (typeof global !== 'undefined') ? global : (typeof globalThis !== 'undefined' ? globalThis : null);
-      if (!g) return;
-      for (const k of Object.keys(overrides)) {
-        try { g[k] = overrides[k]; } catch (e) { /* ignore */ }
+function setTestGlobals(overrides = {}) {
+  try {
+    const g =
+      typeof global !== "undefined"
+        ? global
+        : typeof globalThis !== "undefined"
+        ? globalThis
+        : null;
+    if (!g) return;
+    for (const k of Object.keys(overrides)) {
+      try {
+        g[k] = overrides[k];
+      } catch (e) {
+        /* ignore */
       }
-    } catch (e) {
-      // noop
     }
+  } catch (e) {
+    // noop
   }
+}
 
 /**
  * Load rules from a sheet with flexible column names
@@ -141,11 +161,11 @@ function roundValue(v) {
  */
 function loadRules(tab, patternColumn, options = {}) {
   const { sortByLength = false } = options;
-  
+
   const values = tab.getDataRange().getValues();
   if (values.length < 2) return [];
 
-  const headers = values[0].map(h => String(h).trim());
+  const headers = values[0].map((h) => String(h).trim());
   const iPattern = headers.indexOf(patternColumn);
   const iGroup = headers.indexOf("group");
   const iCategory = headers.indexOf("category");
@@ -163,7 +183,10 @@ function loadRules(tab, patternColumn, options = {}) {
     const pattern = normaliseForMatch(rawPattern);
     const group = String(value[iGroup] || "").trim();
     const category = String(value[iCategory] || "").trim();
-    const mode = String(value[iMode] || "").trim().toLowerCase() || "auto";
+    const mode =
+      String(value[iMode] || "")
+        .trim()
+        .toLowerCase() || "auto";
 
     rules.push({ pattern, group, category, mode });
   }
@@ -191,7 +214,7 @@ function truncate(s, maxLen) {
   return str.length <= maxLen ? str : str.substring(0, maxLen);
 }
 
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     getTabByName,
     getHeaders,
@@ -208,8 +231,8 @@ if (typeof module !== 'undefined' && module.exports) {
     loadRules,
     toIso,
     toMonth,
-    truncate
+    truncate,
   };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports.setTestGlobals = setTestGlobals;
+if (typeof module !== "undefined" && module.exports) module.exports.setTestGlobals = setTestGlobals;

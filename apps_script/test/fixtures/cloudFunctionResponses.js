@@ -4,7 +4,7 @@
  * This file contains factory functions for creating dynamic responses
  */
 
-const responses = require('./cloudFunctionResponses.json');
+const responses = require("./cloudFunctionResponses.json");
 
 /**
  * Creates a mock HTTP error response (for UrlFetchApp)
@@ -12,7 +12,7 @@ const responses = require('./cloudFunctionResponses.json');
 function makeHttpErrorResponse(statusCode, errorMessage) {
   return {
     getResponseCode: () => statusCode,
-    getContentText: () => errorMessage
+    getContentText: () => errorMessage,
   };
 }
 
@@ -24,10 +24,10 @@ function makeCloudFunctionResponse(options = {}) {
     ok = true,
     date = "2026-01-05",
     merchant = "K-Market",
-    total = 10.00,
+    total = 10.0,
     items = [],
     raw_text = "",
-    error = null
+    error = null,
   } = options;
 
   if (!ok) {
@@ -42,8 +42,8 @@ function makeCloudFunctionResponse(options = {}) {
       total,
       items,
       raw_text: raw_text || `${merchant}\n${date}\nYHTEENSÄ ${total}`,
-      currency: "EUR"
-    }
+      currency: "EUR",
+    },
   };
 }
 
@@ -52,5 +52,5 @@ module.exports = {
   ...responses,
   // Export factory functions
   makeHttpErrorResponse,
-  makeCloudFunctionResponse
+  makeCloudFunctionResponse,
 };

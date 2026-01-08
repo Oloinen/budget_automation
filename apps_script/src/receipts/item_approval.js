@@ -1,3 +1,4 @@
+/* exported approveItemStagingEntries */
 /**
  * Item Approval Script (Apps Script)
  *
@@ -24,11 +25,11 @@
 /**
  * Entry point: processes receipt_staging entries with manual categorization.
  * Safe to run multiple times - only processes entries with status NEEDS_REVIEW or NEEDS_RULE.
- * 
+ *
  * @param {string} testSpreadsheetId - Optional spreadsheet ID for E2E testing
  */
 function approveItemStagingEntries(testSpreadsheetId) {
-  const ss = testSpreadsheetId 
+  const ss = testSpreadsheetId
     ? SpreadsheetApp.openById(testSpreadsheetId)
     : SpreadsheetApp.getActive();
 
@@ -37,7 +38,9 @@ function approveItemStagingEntries(testSpreadsheetId) {
   const categoriesSheet = ss.getSheetByName(TAB_CATEGORIES);
 
   if (!stagingSheet || !readySheet || !categoriesSheet) {
-    console.log("Missing required sheets. Ensure receipt_staging, transactions_ready, and categories exist.");
+    Logger.log(
+      "Missing required sheets. Ensure receipt_staging, transactions_ready, and categories exist.",
+    );
     return;
   }
 
@@ -47,11 +50,11 @@ function approveItemStagingEntries(testSpreadsheetId) {
   // Get staging data
   const stagingData = stagingSheet.getDataRange().getValues();
   if (stagingData.length < 2) {
-    console.log("No staging entries to process.");
+    Logger.log("No staging entries to process.");
     return;
   }
 
-  const headers = stagingData[0].map(h => String(h).trim().toLowerCase());
+  const headers = stagingData[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iTxId = colIndex("tx_id");
@@ -95,7 +98,7 @@ function approveItemStagingEntries(testSpreadsheetId) {
       // Invalid category/group combination
       stagingSheet.getRange(rowNum, iStatus + 1).setValue(STATUS_ERROR);
       errors++;
-      console.log(`Row ${rowNum}: Invalid group/category: "${group}" / "${category}"`);
+      Logger.log(`Row ${rowNum}: Invalid group/category: "${group}" / "${category}"`);
       continue;
     }
 
@@ -116,10 +119,10 @@ function approveItemStagingEntries(testSpreadsheetId) {
       month,
       merchant,
       amount,
-      canonical.group,    // Use canonical name from categories
+      canonical.group, // Use canonical name from categories
       canonical.category, // Use canonical name from categories
       nowIso,
-      `receipt:${receiptId}`
+      `receipt:${receiptId}`,
     ]);
 
     // Update staging row: posted_at and status
@@ -128,7 +131,7 @@ function approveItemStagingEntries(testSpreadsheetId) {
     approved++;
   }
 
-  console.log(`Approved ${approved} entries, ${errors} errors.`);
+  Logger.log(`Approved ${approved} entries, ${errors} errors.`);
 }
 
 /**
@@ -140,7 +143,7 @@ function loadValidCategories(categoriesSheet) {
   const data = categoriesSheet.getDataRange().getValues();
   if (data.length < 2) return new Map();
 
-  const headers = data[0].map(h => String(h).trim().toLowerCase());
+  const headers = data[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iGroup = colIndex("group");

@@ -1,3 +1,4 @@
+/* exported runCreditCardImportE2E */
 function runCreditCardImportE2E(testSpreadsheetId, testBudgetYear) {
   // Optional override: set global CONFIG values so existing code uses the test spreadsheet/year.
   this.CONFIG = this.CONFIG || {};
@@ -8,27 +9,47 @@ function runCreditCardImportE2E(testSpreadsheetId, testBudgetYear) {
   try {
     if (testSpreadsheetId) {
       var ss = SpreadsheetApp.openById(testSpreadsheetId);
-      function ensureSheet(name, headers) {
+      var ensureSheet = function (name, headers) {
         var s = ss.getSheetByName(name);
         if (!s) s = ss.insertSheet(name);
         var range = s.getRange(1, 1, 1, headers.length);
         range.setValues([headers]);
-      }
+      };
 
       // Minimal headers — adjust if your import expects different columns
-      ensureSheet(CONFIG.TAB_MERCHANT_RULES || 'merchant_rules', ['pattern', 'mode', 'category']);
-      ensureSheet(CONFIG.TAB_CC_STAGING || 'credit_card_staging', ['Date', 'Merchant', 'Amount', 'status', 'rule_mode', 'txId']);
-      ensureSheet(CONFIG.TAB_CC_READY || 'credit_card_ready', ['Date', 'Merchant', 'Amount', 'txId']);
-      ensureSheet(CONFIG.TAB_CC_SKIPPED || 'credit_card_skipped', ['Date', 'Merchant', 'Amount', 'reason']);
-      ensureSheet(CONFIG.TAB_MERCHANTS_UNKNOWN || 'unknown_merchants', ['merchantName', 'firstSeen']);
+      ensureSheet(CONFIG.TAB_MERCHANT_RULES || "merchant_rules", ["pattern", "mode", "category"]);
+      ensureSheet(CONFIG.TAB_CC_STAGING || "credit_card_staging", [
+        "Date",
+        "Merchant",
+        "Amount",
+        "status",
+        "rule_mode",
+        "txId",
+      ]);
+      ensureSheet(CONFIG.TAB_CC_READY || "credit_card_ready", [
+        "Date",
+        "Merchant",
+        "Amount",
+        "txId",
+      ]);
+      ensureSheet(CONFIG.TAB_CC_SKIPPED || "credit_card_skipped", [
+        "Date",
+        "Merchant",
+        "Amount",
+        "reason",
+      ]);
+      ensureSheet(CONFIG.TAB_MERCHANTS_UNKNOWN || "unknown_merchants", [
+        "merchantName",
+        "firstSeen",
+      ]);
     }
   } catch (e) {
-    return { success: false, error: 'Failed to prepare test spreadsheet: ' + String(e) };
+    return { success: false, error: "Failed to prepare test spreadsheet: " + String(e) };
   }
 
   try {
-    if (typeof runCreditCardImport !== 'function') {
-      return { success: false, error: 'runCreditCardImport() not found in project' };
+    if (typeof runCreditCardImport !== "function") {
+      return { success: false, error: "runCreditCardImport() not found in project" };
     }
 
     var result = runCreditCardImport(testSpreadsheetId);
@@ -38,15 +59,19 @@ function runCreditCardImportE2E(testSpreadsheetId, testBudgetYear) {
     if (testSpreadsheetId) {
       try {
         var ss2 = SpreadsheetApp.openById(testSpreadsheetId);
-        function getValues(name) {
+        var getValues = function (name) {
           var s = ss2.getSheetByName(name);
           return s ? s.getDataRange().getValues() : null;
-        }
-        outputs.unknowns = getValues(CONFIG.TAB_MERCHANTS_UNKNOWN) || getValues('Unknown merchants') || getValues('Unknown');
-        outputs.staging = getValues(CONFIG.TAB_CC_STAGING) || getValues('Staging') || getValues('staged');
-        outputs.ready = getValues(CONFIG.TAB_CC_READY) || getValues('Ready') || getValues('ready');
+        };
+        outputs.unknowns =
+          getValues(CONFIG.TAB_MERCHANTS_UNKNOWN) ||
+          getValues("Unknown merchants") ||
+          getValues("Unknown");
+        outputs.staging =
+          getValues(CONFIG.TAB_CC_STAGING) || getValues("Staging") || getValues("staged");
+        outputs.ready = getValues(CONFIG.TAB_CC_READY) || getValues("Ready") || getValues("ready");
       } catch (e) {
-        outputs.error = 'Failed to open test spreadsheet after run: ' + String(e);
+        outputs.error = "Failed to open test spreadsheet after run: " + String(e);
       }
     }
 

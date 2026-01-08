@@ -1,11 +1,11 @@
-const { getHeaders, readColumnValues, appendRows, getTabByName } = require('../../src/utils');
+const { getHeaders, readColumnValues, appendRows, getTabByName } = require("../../src/utils");
 
-describe('sheet utils', () => {
-  describe('getHeaders', () => {
-    test('trims header strings, ignores empty headers, returns 1-based indexes', () => {
+describe("sheet utils", () => {
+  describe("getHeaders", () => {
+    test("trims header strings, ignores empty headers, returns 1-based indexes", () => {
       const tab = {
         getLastColumn: () => 3,
-        getRange: (r, c, nr, nc) => ({ getValues: () => [[" tx_id ", "", "amount"]] })
+        getRange: (r, c, nr, nc) => ({ getValues: () => [[" tx_id ", "", "amount"]] }),
       };
 
       const map = getHeaders(tab);
@@ -13,26 +13,26 @@ describe('sheet utils', () => {
     });
   });
 
-  describe('readColumnValues', () => {
-    test('returns [] if header missing', () => {
+  describe("readColumnValues", () => {
+    test("returns [] if header missing", () => {
       const tab = {
         getLastColumn: () => 1,
         getRange: (r, c, nr, nc) => ({ getValues: () => [["only"]] }),
-        getLastRow: () => 1
+        getLastRow: () => 1,
       };
-      expect(readColumnValues(tab, 'nope')).toEqual([]);
+      expect(readColumnValues(tab, "nope")).toEqual([]);
     });
 
-    test('returns [] if only header row exists', () => {
+    test("returns [] if only header row exists", () => {
       const tab = {
         getLastColumn: () => 2,
         getRange: (r, c, nr, nc) => ({ getValues: () => [["a", "b"]] }),
-        getLastRow: () => 1
+        getLastRow: () => 1,
       };
-      expect(readColumnValues(tab, 'a')).toEqual([]);
+      expect(readColumnValues(tab, "a")).toEqual([]);
     });
 
-    test('returns column values excluding header and flattens correctly', () => {
+    test("returns column values excluding header and flattens correctly", () => {
       // Header row + 3 data rows in col 2
       const calls = [];
       const tab = {
@@ -43,38 +43,46 @@ describe('sheet utils', () => {
           // data range starting at row 2
           return { getValues: () => [["v1"], ["v2"], ["v3"]] };
         },
-        getLastRow: () => 4
+        getLastRow: () => 4,
       };
 
-      const values = readColumnValues(tab, 'h2');
+      const values = readColumnValues(tab, "h2");
       expect(values).toEqual(["v1", "v2", "v3"]);
       // ensure getRange was called for header and for data
       expect(calls.length).toBeGreaterThanOrEqual(2);
     });
   });
 
-  describe('appendRows', () => {
-    test('does nothing when rows empty', () => {
+  describe("appendRows", () => {
+    test("does nothing when rows empty", () => {
       let called = false;
       const tab = {
-        getLastRow: () => { called = true; return 1; },
-        getRange: () => { throw new Error('should not be called'); }
+        getLastRow: () => {
+          called = true;
+          return 1;
+        },
+        getRange: () => {
+          throw new Error("should not be called");
+        },
       };
       appendRows(tab, []);
       // appendRows returns early; getLastRow should not be used and getRange must not be called
       expect(called).toBe(false);
     });
 
-    test('appends at lastRow + 1 and writes correct dimensions', () => {
+    test("appends at lastRow + 1 and writes correct dimensions", () => {
       const ops = [];
       const tab = {
         getLastRow: () => 5,
         getRange: (startRow, startCol, numRows, numCols) => ({
-          setValues: (rows) => ops.push({ startRow, startCol, numRows, numCols, rows })
-        })
+          setValues: (rows) => ops.push({ startRow, startCol, numRows, numCols, rows }),
+        }),
       };
 
-      const rows = [[1, 2, 3], [4, 5, 6]];
+      const rows = [
+        [1, 2, 3],
+        [4, 5, 6],
+      ];
       appendRows(tab, rows);
       expect(ops.length).toBe(1);
       expect(ops[0].startRow).toBe(6);
@@ -85,16 +93,16 @@ describe('sheet utils', () => {
     });
   });
 
-  describe('getTabByName', () => {
-    test('returns tab if exists', () => {
+  describe("getTabByName", () => {
+    test("returns tab if exists", () => {
       const tab = {};
-      const sheet = { getSheetByName: (name) => name === 'OK' ? tab : null };
-      expect(getTabByName(sheet, 'OK')).toBe(tab);
+      const sheet = { getSheetByName: (name) => (name === "OK" ? tab : null) };
+      expect(getTabByName(sheet, "OK")).toBe(tab);
     });
 
-    test('throws with clear message if missing', () => {
+    test("throws with clear message if missing", () => {
       const sheet = { getSheetByName: () => null };
-      expect(() => getTabByName(sheet, 'MISSING')).toThrow(/Missing tab: MISSING/);
+      expect(() => getTabByName(sheet, "MISSING")).toThrow(/Missing tab: MISSING/);
     });
   });
 });

@@ -1,3 +1,4 @@
+/* exported approveMerchantStagingEntries */
 /**
  * Merchant Approval Script (Apps Script)
  *
@@ -23,11 +24,11 @@
 /**
  * Entry point: processes credit_card_staging entries with manual categorization.
  * Safe to run multiple times - only processes entries with status NEEDS_REVIEW or NEEDS_RULE.
- * 
+ *
  * @param {string} testSpreadsheetId - Optional spreadsheet ID for E2E testing
  */
 function approveMerchantStagingEntries(testSpreadsheetId) {
-  const ss = testSpreadsheetId 
+  const ss = testSpreadsheetId
     ? SpreadsheetApp.openById(testSpreadsheetId)
     : SpreadsheetApp.getActive();
 
@@ -36,7 +37,9 @@ function approveMerchantStagingEntries(testSpreadsheetId) {
   const categoriesSheet = ss.getSheetByName(TAB_CATEGORIES);
 
   if (!stagingSheet || !readySheet || !categoriesSheet) {
-    console.log("Missing required sheets. Ensure credit_card_staging, transactions_ready, and categories exist.");
+    Logger.log(
+      "Missing required sheets. Ensure credit_card_staging, transactions_ready, and categories exist.",
+    );
     return;
   }
 
@@ -46,11 +49,11 @@ function approveMerchantStagingEntries(testSpreadsheetId) {
   // Get staging data
   const stagingData = stagingSheet.getDataRange().getValues();
   if (stagingData.length < 2) {
-    console.log("No staging entries to process.");
+    Logger.log("No staging entries to process.");
     return;
   }
 
-  const headers = stagingData[0].map(h => String(h).trim().toLowerCase());
+  const headers = stagingData[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iTxId = colIndex("tx_id");
@@ -93,7 +96,7 @@ function approveMerchantStagingEntries(testSpreadsheetId) {
       // Invalid category/group combination
       stagingSheet.getRange(rowNum, iStatus + 1).setValue(STATUS_ERROR);
       errors++;
-      console.log(`Row ${rowNum}: Invalid group/category: "${group}" / "${category}"`);
+      Logger.log(`Row ${rowNum}: Invalid group/category: "${group}" / "${category}"`);
       continue;
     }
 
@@ -113,10 +116,10 @@ function approveMerchantStagingEntries(testSpreadsheetId) {
       month,
       merchant,
       amount,
-      canonical.group,    // Use canonical name from categories
+      canonical.group, // Use canonical name from categories
       canonical.category, // Use canonical name from categories
       nowIso,
-      'credit_card'
+      "credit_card",
     ]);
 
     // Update staging row: posted_at and status
@@ -125,7 +128,7 @@ function approveMerchantStagingEntries(testSpreadsheetId) {
     approved++;
   }
 
-  console.log(`Approved ${approved} entries, ${errors} errors.`);
+  Logger.log(`Approved ${approved} entries, ${errors} errors.`);
 }
 
 /**
@@ -137,7 +140,7 @@ function loadValidCategories(categoriesSheet) {
   const data = categoriesSheet.getDataRange().getValues();
   if (data.length < 2) return new Map();
 
-  const headers = data[0].map(h => String(h).trim().toLowerCase());
+  const headers = data[0].map((h) => String(h).trim().toLowerCase());
   const colIndex = (name) => headers.indexOf(name);
 
   const iGroup = colIndex("group");

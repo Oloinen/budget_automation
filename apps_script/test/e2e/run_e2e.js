@@ -2,7 +2,7 @@
 // Node helper to invoke the Apps Script E2E runner via the Apps Script Execution API.
 // Requires environment variables: APPS_SCRIPT_ID, TEST_SPREADSHEET_ID, and GOOGLE_SERVICE_ACCOUNT_KEY_JSON
 
-const {google} = require('googleapis');
+const { google } = require("googleapis");
 
 async function main() {
   const scriptId = process.env.APPS_SCRIPT_ID;
@@ -11,7 +11,9 @@ async function main() {
   const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON;
 
   if (!scriptId || !testSpreadsheetId || !keyJson) {
-    console.error('Missing required env vars. Set APPS_SCRIPT_ID, TEST_SPREADSHEET_ID, and GOOGLE_SERVICE_ACCOUNT_KEY_JSON');
+    console.error(
+      "Missing required env vars. Set APPS_SCRIPT_ID, TEST_SPREADSHEET_ID, and GOOGLE_SERVICE_ACCOUNT_KEY_JSON",
+    );
     process.exit(2);
   }
 
@@ -19,22 +21,22 @@ async function main() {
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: [
-      'https://www.googleapis.com/auth/script.projects',
-      'https://www.googleapis.com/auth/spreadsheets',
-      'https://www.googleapis.com/auth/drive'
-    ]
+      "https://www.googleapis.com/auth/script.projects",
+      "https://www.googleapis.com/auth/spreadsheets",
+      "https://www.googleapis.com/auth/drive",
+    ],
   });
 
   const client = await auth.getClient();
-  const script = google.script({ version: 'v1', auth: client });
+  const script = google.script({ version: "v1", auth: client });
 
   const request = {
     scriptId,
     requestBody: {
-      function: 'runCreditCardImportE2E',
+      function: "runCreditCardImportE2E",
       parameters: testBudgetYear ? [testSpreadsheetId, testBudgetYear] : [testSpreadsheetId],
-      devMode: true
-    }
+      devMode: true,
+    },
   };
 
   try {
@@ -42,7 +44,7 @@ async function main() {
     console.log(JSON.stringify(res.data, null, 2));
     if (res.data.error) process.exit(1);
   } catch (e) {
-    console.error('Execution error', e);
+    console.error("Execution error", e);
     process.exit(1);
   }
 }

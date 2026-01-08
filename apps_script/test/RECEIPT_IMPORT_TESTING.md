@@ -5,6 +5,7 @@ This directory contains tests for the receipt import functionality.
 ## Test Files
 
 ### `receipt_import.test.js` - Unit Tests
+
 Tests individual functions and logic without external dependencies:
 
 - **Rule Matching**: Tests for equals, contains, and regex matching modes
@@ -15,6 +16,7 @@ Tests individual functions and logic without external dependencies:
 - **Item Processing**: Tests item filtering and validation logic
 
 ### `receipt_import.mock.test.js` - Integration Tests
+
 Tests the full receipt import flow with mocked Apps Script globals and Cloud Function:
 
 - **File Filtering**: Tests that PDFs and images are processed, other files skipped
@@ -30,7 +32,9 @@ Tests the full receipt import flow with mocked Apps Script globals and Cloud Fun
 ### Mocks (`mocks/`)
 
 #### `appsScriptGlobalsMock.js`
+
 Provides mock implementations of Apps Script globals:
+
 - **`makeMockSpreadsheet()`**: Creates mock spreadsheet with sheet tracking
 - **`makeMockFolder(files)`**: Creates mock Drive folder with file iteration
 - **`makeMockFiles()`**: Returns array of mock file objects
@@ -39,14 +43,16 @@ Provides mock implementations of Apps Script globals:
 - **`setupAppsScriptGlobals(options)`**: One-step setup of all mocks
 
 Usage:
+
 ```javascript
-const { setupAppsScriptGlobals } = require('./mocks/appsScriptGlobalsMock');
+const { setupAppsScriptGlobals } = require("./mocks/appsScriptGlobalsMock");
 const mocks = setupAppsScriptGlobals({
-  cloudFunctionResponse: yourResponse
+  cloudFunctionResponse: yourResponse,
 });
 ```
 
 #### `sheetsAdapterMock.js`
+
 Mock adapter for sheet operations (used by credit card import tests too).
 
 ### Fixtures (`fixtures/`)
@@ -57,6 +63,7 @@ Fixtures are split between **JSON files** (pure data) and **JavaScript files** (
 
 **`cloudFunctionResponses.json`**
 Pre-built Cloud Function response scenarios:
+
 - `successfulResponse`: Receipt with multiple items
 - `noItemsResponse`: Receipt with no items parsed
 - `minimalResponse`: Receipt with missing fields
@@ -66,6 +73,7 @@ Pre-built Cloud Function response scenarios:
 
 **`itemRules.json`**
 Pre-defined rule sets:
+
 - `basic`: Essential rules (maito, leipä, juusto)
 - `comprehensive`: Extended rules including household items
 - `withModes`: Rules demonstrating different match modes
@@ -73,6 +81,7 @@ Pre-defined rule sets:
 
 **`expectedRows.json`**
 Expected sheet row data for assertions:
+
 - `receiptFiles`: processed, error
 - `transactionsReady`: matched
 - `receiptStaging`: needsRule, noItems
@@ -80,6 +89,7 @@ Expected sheet row data for assertions:
 
 **`receiptItems.json`**
 Sample items for different scenarios:
+
 - `matched`: Items that should match rules
 - `unmatched`: Items that won't match any rules
 - `mixed`: Mix of matched and unmatched items
@@ -89,12 +99,14 @@ Sample items for different scenarios:
 
 **`cloudFunctionResponses.js`**
 Factory functions for creating dynamic responses:
+
 - `makeHttpErrorResponse(code, msg)`: Creates HTTP error responses (returns object with methods)
 - `makeCloudFunctionResponse(options)`: Custom response builder
 - Re-exports all JSON responses for convenience
 
 **`receiptData.js`**
 Mock objects with methods:
+
 - `receiptFiles`: Mock file objects with `getId()`, `getName()`, `getMimeType()` methods
 - `cursorStates`: Cursor states for testing resumable processing
 - Re-exports itemRules, expectedRows, receiptItems from JSON
@@ -102,21 +114,25 @@ Mock objects with methods:
 ## Running Tests
 
 ### Run all receipt import tests:
+
 ```bash
 npm test -- receipt_import
 ```
 
 ### Run only unit tests:
+
 ```bash
 npm test -- receipt_import.test
 ```
 
 ### Run only integration/mock tests:
+
 ```bash
 npm test -- receipt_import.mock
 ```
 
 ### Run all tests:
+
 ```bash
 npm test
 ```
@@ -124,6 +140,7 @@ npm test
 ## Test Coverage
 
 The tests cover:
+
 - ✅ File type filtering (PDF, JPG, PNG supported)
 - ✅ Cloud Function authentication and response handling
 - ✅ Item rule matching (equals, contains, regex modes)
@@ -139,14 +156,15 @@ The tests cover:
 ## Using Mocks and Fixtures in Tests
 
 ### Basic Setup
+
 ```javascript
-const { setupAppsScriptGlobals } = require('./mocks/appsScriptGlobalsMock');
-const { successfulResponse } = require('./fixtures/cloudFunctionResponses');
-const { itemRules, receiptItems } = require('./fixtures/receiptData');
+const { setupAppsScriptGlobals } = require("./mocks/appsScriptGlobalsMock");
+const { successfulResponse } = require("./fixtures/cloudFunctionResponses");
+const { itemRules, receiptItems } = require("./fixtures/receiptData");
 
 // Setup all mocks
 const mocks = setupAppsScriptGlobals({
-  cloudFunctionResponse: successfulResponse
+  cloudFunctionResponse: successfulResponse,
 });
 
 // Access mocked objects
@@ -154,30 +172,32 @@ const sheet = mocks.mockSpreadsheet.getSheetByName("transactions_ready");
 const rulesSheet = mocks.mockSpreadsheet.getSheetByName("item_rules");
 
 // Populate with test data
-itemRules.basic.forEach(rule => rulesSheet.appendRow(rule));
+itemRules.basic.forEach((rule) => rulesSheet.appendRow(rule));
 ```
 
 ### Custom Response Handling
+
 ```javascript
-const { setupAppsScriptGlobals } = require('./mocks/appsScriptGlobalsMock');
+const { setupAppsScriptGlobals } = require("./mocks/appsScriptGlobalsMock");
 
 const mocks = setupAppsScriptGlobals({
   customResponseHandler: (request) => {
     if (request.payload.fileId === "error-file") {
       return {
         getResponseCode: () => 500,
-        getContentText: () => "Internal Server Error"
+        getContentText: () => "Internal Server Error",
       };
     }
     return {
       getResponseCode: () => 200,
-      getContentText: () => JSON.stringify({ ok: true, result: {} })
+      getContentText: () => JSON.stringify({ ok: true, result: {} }),
     };
-  }
+  },
 });
 ```
 
 ### Inspecting Mock State
+
 ```javascript
 // Check what was written to sheets
 const filesSheet = mocks.mockSpreadsheet.getSheetByName("receipt_files");
@@ -197,6 +217,7 @@ expect(cursor).toBe("receipt2.jpg");
 ## Mock Structure
 
 The mock tests use:
+
 - **Mock Apps Script globals**: SpreadsheetApp, DriveApp, PropertiesService, UrlFetchApp, ScriptApp
 - **Mock Cloud Function**: Returns test receipt data with items
 - **Mock sheets**: In-memory sheet implementation tracking appendRow calls
@@ -216,18 +237,18 @@ When adding functionality to receipt_import.js:
 
 ```javascript
 // In receipt_import.mock.test.js
-const { setupAppsScriptGlobals } = require('./mocks/appsScriptGlobalsMock');
-const { sMarketResponse } = require('./fixtures/cloudFunctionResponses');
-const { itemRules } = require('./fixtures/receiptData');
+const { setupAppsScriptGlobals } = require("./mocks/appsScriptGlobalsMock");
+const { sMarketResponse } = require("./fixtures/cloudFunctionResponses");
+const { itemRules } = require("./fixtures/receiptData");
 
-test('should process S-Market receipts correctly', () => {
+test("should process S-Market receipts correctly", () => {
   const mocks = setupAppsScriptGlobals({
-    cloudFunctionResponse: sMarketResponse
+    cloudFunctionResponse: sMarketResponse,
   });
-  
+
   const rulesSheet = mocks.mockSpreadsheet.getSheetByName("item_rules");
-  itemRules.comprehensive.forEach(rule => rulesSheet.appendRow(rule));
-  
+  itemRules.comprehensive.forEach((rule) => rulesSheet.appendRow(rule));
+
   // Your test logic here
 });
 ```
@@ -235,6 +256,7 @@ test('should process S-Market receipts correctly', () => {
 ## Test Data
 
 ### Example Cloud Function Response (from fixtures)
+
 ```javascript
 const successfulResponse = {
   ok: true,
@@ -244,22 +266,23 @@ const successfulResponse = {
     total: 15.67,
     items: [
       { name: "Maito 1L", amount: 1.89 },
-      { name: "Ruisleipä", amount: 2.50 },
-      { name: "Unknown Item", amount: 3.99 }
+      { name: "Ruisleipä", amount: 2.5 },
+      { name: "Unknown Item", amount: 3.99 },
     ],
-    raw_text: "K-Market\\n05.01.2026\\n..."
-  }
+    raw_text: "K-Market\\n05.01.2026\\n...",
+  },
 };
 ```
 
 ### Example Item Rules (from fixtures)
+
 ```javascript
 const itemRules = {
   basic: [
     ["maito", "Food", "Groceries", "contains"],
     ["leipä", "Food", "Groceries", "contains"],
-    ["juusto", "Food", "Groceries", "contains"]
-  ]
+    ["juusto", "Food", "Groceries", "contains"],
+  ],
 };
 ```
 
@@ -292,23 +315,27 @@ apps_script/test/
 ## Design Principles
 
 ### JSON for Pure Data ✅
+
 - API responses
 - Configuration data
 - Expected outputs
 - Test data that's just data
 
 **Benefits:**
+
 - Language agnostic
 - Can validate against schemas
 - Clean version control diffs
 - Easy to read and edit
 
 ### JavaScript for Behavioral Mocks ✅
+
 - Objects with methods
 - Factory functions
 - Mock implementations with logic
 
 **Benefits:**
+
 - Can include functions
 - Dynamic values
 - Can reference other modules

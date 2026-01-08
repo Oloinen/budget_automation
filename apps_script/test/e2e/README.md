@@ -5,6 +5,7 @@ End-to-end integration tests for Budget Automation Apps Script.
 ## Overview
 
 E2E tests validate the complete workflow by:
+
 1. Creating test spreadsheets from templates
 2. Uploading fixture CSV files
 3. Running Apps Script import/approval functions
@@ -48,26 +49,28 @@ Tests run automatically on push/PR. See [`../../.github/SETUP_CI.md`](../../.git
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | Full JSON content of service account key |
-| `APPS_SCRIPT_ID` | Your Apps Script project ID |
-| `TEST_TEMPLATE_SHEET_ID` | Template spreadsheet ID for creating test sheets |
-| `TEST_FOLDER_ID` | Google Drive folder ID for test files |
-| `TEST_RECEIPTS_FOLDER_ID` | (Optional) Google Drive folder ID for test receipt files - required for receipt import testing |
-| `TEST_BUDGET_YEAR` | (Optional) Year for testing, defaults to 2026 |
-| `SKIP_CLEANUP` | Set to `true` to keep test files after run |
+| Variable                          | Description                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | Full JSON content of service account key                                                       |
+| `APPS_SCRIPT_ID`                  | Your Apps Script project ID                                                                    |
+| `TEST_TEMPLATE_SHEET_ID`          | Template spreadsheet ID for creating test sheets                                               |
+| `TEST_FOLDER_ID`                  | Google Drive folder ID for test files                                                          |
+| `TEST_RECEIPTS_FOLDER_ID`         | (Optional) Google Drive folder ID for test receipt files - required for receipt import testing |
+| `TEST_BUDGET_YEAR`                | (Optional) Year for testing, defaults to 2026                                                  |
+| `SKIP_CLEANUP`                    | Set to `true` to keep test files after run                                                     |
 
 ## Test Coverage
 
 The full E2E suite (`run_full_e2e.js`) tests:
 
 ### Setup Phase
+
 - ✅ Spreadsheet creation from template
 - ✅ CSV file upload to Drive
 - ✅ Test data seeding (categories, merchant rules)
 
 ### Workflow Tests
+
 - ✅ **Credit card import workflow** - CSV parsing, categorization, unknown tracking
 - ✅ **Receipt import workflow** - Cloud Function OCR, item parsing, categorization (optional - requires TEST_RECEIPTS_FOLDER_ID)
   - Uploads test receipt files to Drive
@@ -96,13 +99,15 @@ The full E2E suite (`run_full_e2e.js`) tests:
   - Validates item rules are created correctly
   - Validates rule details (pattern, category, mode)
   - Validates unknown_items sheet is cleared
-  
+
 ### Validation
+
 - ✅ Data structure validation (headers, required fields)
 - ✅ Transaction data integrity checks
 - ✅ Sheet state verification after each workflow
 
 ### Cleanup
+
 - ✅ Automatic test file deletion (or keep with `SKIP_CLEANUP=true`)
 
 ## Legacy Runner (run_e2e.js)
@@ -120,6 +125,7 @@ node test/e2e/run_e2e.js
 ## Service Account Setup
 
 See [`../../.github/SETUP_CI.md`](../../.github/SETUP_CI.md) for detailed instructions on:
+
 - Creating service account
 - Granting necessary permissions
 - Generating and configuring keys
