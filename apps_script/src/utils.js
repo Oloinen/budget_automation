@@ -130,6 +130,67 @@ function roundValue(v) {
     }
   }
 
+/**
+ * Load rules from a sheet with flexible column names
+ * Patterns are always normalized for consistent matching.
+ * @param {Sheet} tab - The sheet to read from
+ * @param {string} patternColumn - Name of the column containing the pattern (e.g., "merchant" or "pattern")
+ * @param {Object} options - Optional configuration
+ * @param {boolean} options.sortByLength - Whether to sort rules by pattern length descending (default: false)
+ * @returns {Array} Array of rule objects with {pattern, group, category, mode}
+ */
+function loadRules(tab, patternColumn, options = {}) {
+  const { sortByLength = false } = options;
+  
+  const values = tab.getDataRange().getValues();
+  if (values.length < 2) return [];
+
+  const headers = values[0].map(h => String(h).trim());
+  const iPattern = headers.indexOf(patternColumn);
+  const iGroup = headers.indexOf("group");
+  const iCategory = headers.indexOf("category");
+  const iMode = headers.indexOf("mode");
+
+  if (iPattern === -1 || iGroup === -1 || iCategory === -1 || iMode === -1) {
+    throw new Error(`Rules sheet must have headers: ${patternColumn}, group, category, mode`);
+  }
+
+  const rules = [];
+  for (const value of values.slice(1)) {
+    const rawPattern = String(value[iPattern] || "").trim();
+    if (!rawPattern) continue;
+
+    const pattern = normaliseForMatch(rawPattern);
+    const group = String(value[iGroup] || "").trim();
+    const category = String(value[iCategory] || "").trim();
+    const mode = String(value[iMode] || "").trim().toLowerCase() || "auto";
+
+    rules.push({ pattern, group, category, mode });
+  }
+
+  if (sortByLength) {
+    rules.sort((a, b) => b.pattern.length - a.pattern.length);
+  }
+
+  return rules;
+}
+
+function toIso(d) {
+  // Apps Script Date -> ISO-like string in spreadsheet-friendly format
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+function toMonth(yyyyMmDd) {
+  // expects "YYYY-MM-DD"
+  if (!yyyyMmDd || typeof yyyyMmDd !== "string" || yyyyMmDd.length < 7) return "";
+  return yyyyMmDd.substring(0, 7); // "YYYY-MM"
+}
+
+function truncate(s, maxLen) {
+  const str = String(s ?? "");
+  return str.length <= maxLen ? str : str.substring(0, maxLen);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getTabByName,
@@ -143,7 +204,11 @@ if (typeof module !== 'undefined' && module.exports) {
     makeTxId,
     roundValue,
     findBestRule,
-    normaliseForMatch
+    normaliseForMatch,
+    loadRules,
+    toIso,
+    toMonth,
+    truncate
   };
 }
 

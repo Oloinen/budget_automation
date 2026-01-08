@@ -1,0 +1,78 @@
+{
+  "receiptFiles": {
+    "processed": [
+      "receipt-123",
+      "file-001",
+      "receipt1.pdf",
+      "2026-01-05T12:00:00",
+      "PROCESSED",
+      "2026-01-05",
+      "K-Market",
+      15.67,
+      false,
+      ""
+    ],
+    "error": [
+      "receipt-error",
+      "file-002",
+      "receipt2.jpg",
+      "2026-01-05T12:00:00",
+      "ERROR",
+      "",
+      "",
+      "",
+      false,
+      "Receipt extractor error HTTP 500"
+    ]
+  },
+  "transactionsReady": {
+    "matched": [
+      "tx-123",
+      "2026-01-05",
+      "2026-01",
+      "K-Market",
+      1.89,
+      "Food",
+      "Groceries",
+      "2026-01-05T12:00:00",
+      "receipt:receipt-123"
+    ]
+  },
+  "receiptStaging": {
+    "needsRule": [
+      "tx-456",
+      "2026-01-05",
+      "receipt-123",
+      "K-Market",
+      3.99,
+      "K-Market\n05.01.2026\nUnknown Item 3.99",
+      "",
+      "",
+      "2026-01-05T12:00:00",
+      "NEEDS_RULE"
+    ],
+    "noItems": [
+      "tx-789",
+      "2026-01-05",
+      "receipt-123",
+      "K-Market",
+      15.67,
+      "Raw OCR text...",
+      "",
+      "",
+      "2026-01-05T12:00:00",
+      "NO_ITEMS_PARSED"
+    ]
+  },
+  "unknownItems": {
+    "first": [
+      "Unknown Item",
+      "",
+      "",
+      "equals",
+      1,
+      "2026-01-05T12:00:00",
+      "2026-01-05T12:00:00"
+    ]
+  }
+}

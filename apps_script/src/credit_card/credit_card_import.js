@@ -1,16 +1,13 @@
 /***********************
  * CREDIT CARD IMPORT (statement CSV -> data sheet tables)
  *
- * Data (database) spreadsheet tabs + headers (snake_case tabs, as you listed):
- *  - merchant_rules:        merchant, group, category, mode
- *  - credit_card_staging:   tx_id, date, merchant, amount, rule_mode, group, category, posted_at, status
- *  - credit_card_ready:     tx_id, date, month, merchant, amount, group, category, posted_at
- *  - unknown_merchants:     merchant, category, mode, count, first_seen, last_seen
- *  - credit_card_skipped:   tx_id, date, merchant, amount, receipt_id, verified, verified_at
+ * Tabs used: merchant_rules, credit_card_staging, transactions_ready,
+ *            unknown_merchants, credit_card_skipped
+ * (See config.js HEADERS_* for schema)
  *
  * Matching:
- *  - case-insensitive substring: merchantRule.merchant is substring of statement "Location of purchase"
- *  - longest merchantRule.merchant wins
+ *  - case-insensitive substring: rule.merchant is substring of statement "Location of purchase"
+ *  - longest rule.merchant wins
  *
  * Year filter:
  *  - imports only rows where "Date of payment" year == BUDGET_YEAR
@@ -18,14 +15,13 @@
  * Idempotency:
  *  - will NOT re-import rows whose tx_id already exists in staging/ready/skipped
  *
- * mode behavior:
- *  - auto  -> credit_card_ready
- *  - review -> credit_card_staging (status = needs_review)
- *  - skip  -> credit_card_skipped (verified=false, verified_at empty, receipt_id empty)
- *  - no match -> credit_card_staging (status = blocked) + unknown_merchants upsert
+ * Mode behavior:
+ *  - auto   -> transactions_ready
+ *  - review -> credit_card_staging (status = NEEDS_REVIEW)
+ *  - skip   -> credit_card_skipped
+ *  - no match -> credit_card_staging (status = NEEDS_RULE) + unknown_merchants upsert
  *
  * NOTE: statement amounts are negative for expenses; script stores absolute value (positive).
- * If you want to keep negatives, change `const amountAbs = Math.abs(amountRaw);`
  ***********************/
 
 /********** TRIGGER (optional) **********/
@@ -43,8 +39,8 @@ function setupDailyCcImport0400() {
     .create();
 }
 
-// Helpers imported from utils.js: getTabByName, getHeaders, readColumnValues,
-// appendRows, setIfExists, makeRow, parseAmount, parseDate, makeTxId, normaliseForMatch
+// Helpers from utils.js: getTabByName, getHeaders, readColumnValues, appendRows,
+// setIfExists, makeRow, parseAmount, parseDate, makeTxId, normaliseForMatch, loadRules, roundValue
 
 /********** MAIN **********/
 function runCreditCardImport() {
@@ -58,7 +54,7 @@ function runCreditCardImport() {
   const tabUnknown = getTabByName(budgetData, TAB_MERCHANTS_UNKNOWN);
   const tabSkipped = getTabByName(budgetData, TAB_CC_SKIPPED);
 
-  const rules = loadMerchantRules(tabRules); // array, longest-first
+  const rules = loadRules(tabRules, "merchant", { sortByLength: true }); // array, longest-first
 
   const mapStaging = getHeaders(tabStaging);
   const mapReady = getHeaders(tabReady);
@@ -139,7 +135,7 @@ function runCreditCardImport() {
 
 // Pure processing helper: given parsed records, return rows to write.
 // `records` should be array of objects: { dateRaw, merchantRaw, amountRaw }
-// `opts` can override utilities for testing: { tz, budgetYear, rules, existingTxIds, findBestRule, makeTxId, parseDate, parseAmount, normaliseForMatch, makeRow, roundValue }
+// `opts` can override utilities for testing: { tz, budgetYear, rules, existingTxIds, findBestRule, makeTxId, parseDate, parseAmount, normaliseForMatch, roundValue }
 function processCreditCardRecords(records, opts = {}) {
   const tz = opts.tz || (typeof Session !== 'undefined' && Session.getScriptTimeZone ? Session.getScriptTimeZone() : 'UTC');
   const BUDGET_YEAR_LOCAL = Number(opts.budgetYear || (typeof BUDGET_YEAR !== 'undefined' ? BUDGET_YEAR : new Date().getFullYear()));
@@ -150,8 +146,7 @@ function processCreditCardRecords(records, opts = {}) {
   const pDate = opts.parseDate || parseDate;
   const pAmount = opts.parseAmount || parseAmount;
   const norm = opts.normaliseForMatch || normaliseForMatch;
-  const mkRow = opts.makeRow || ((map, obj) => obj);
-  const round = opts.roundValue || (x => Math.round((x + Number.EPSILON) * 100) / 100);
+  const round = opts.roundValue || roundValue;
   const formatDate = opts.formatDate || function(date, tzArg, pattern) {
     const d = (date instanceof Date) ? date : new Date(date);
     const yyyy = d.getUTCFullYear();
@@ -257,7 +252,7 @@ function processCreditCardRecords(records, opts = {}) {
           group: '',
           category: '',
           posted_at: '',
-          status: STATUS_BLOCKED
+          status: STATUS_NEEDS_RULE
         });
         unknowns.push({ merchant: merchantRaw, key: merchantTrimmed, date: dateStr });
     }
@@ -266,5 +261,6 @@ function processCreditCardRecords(records, opts = {}) {
   return { rowsToReady, rowsToStaging, rowsToSkipped, unknowns, existingTxIds };
 }
 
-if (typeof module !== 'undefined' && module.exports) module.exports = module.exports || {};
-if (typeof module !== 'undefined' && module.exports) module.exports.processCreditCardRecords = processCreditCardRecords;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { processCreditCardRecords };
+}
