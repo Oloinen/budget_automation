@@ -223,6 +223,13 @@ function setupAppsScriptGlobals(options = {}) {
 
   global.UrlFetchApp = mockUrlFetchApp;
 
+  global.Logger = {
+    log: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+  };
+
   global.ScriptApp = {
     getIdentityToken: () => "mock-token-12345",
   };
@@ -251,11 +258,11 @@ function setupAppsScriptGlobals(options = {}) {
     "receipt_id",
     "merchant",
     "amount",
-    "raw_ocr",
     "group",
     "category",
     "posted_at",
     "status",
+    "raw_ocr",
   ];
   global.HEADERS_RECEIPT_FILES = [
     "receipt_id",
@@ -263,6 +270,7 @@ function setupAppsScriptGlobals(options = {}) {
     "file_name",
     "imported_at",
     "status",
+    "retry_count",
     "detected_date",
     "detected_merchant",
     "detected_amount",
@@ -278,6 +286,7 @@ function setupAppsScriptGlobals(options = {}) {
     "count",
     "first_seen",
     "last_seen",
+    "status",
   ];
 
   return {

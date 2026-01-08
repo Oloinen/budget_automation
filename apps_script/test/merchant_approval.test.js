@@ -123,6 +123,7 @@ function loadFunctions() {
     "TAB_TRANSACTIONS_READY",
     "TAB_CATEGORIES",
     "console",
+    "Logger",
     approvalCode + "\nreturn { approveMerchantStagingEntries, loadValidCategories };",
   );
 
@@ -139,6 +140,7 @@ function loadFunctions() {
     TAB_TRANSACTIONS_READY,
     TAB_CATEGORIES,
     console,
+    { log: () => {} }, // Logger mock
   );
 }
 

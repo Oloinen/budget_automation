@@ -1,6 +1,7 @@
 # Local configuration
 /apps_script/src/config.local.js
 plan.txt
+plan.md
 
 # Node dependencies
 node_modules/
@@ -49,6 +50,9 @@ logs/
 *.json.key
 *credentials*.json
 service-account*.json
+
+# E2E test environment (keep .env.template)
+test/e2e/.env
 
 # Temporary files
 *.tmp

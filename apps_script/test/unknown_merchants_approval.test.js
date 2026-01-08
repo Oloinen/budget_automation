@@ -111,7 +111,8 @@ function loadFunctions() {
     "TAB_MERCHANTS_UNKNOWN",
     "TAB_MERCHANT_RULES",
     "TAB_CATEGORIES",
-    "console",
+      "console",
+      "Logger",
     approvalCode +
       "\nreturn { approveUnknownMerchants, loadValidCategoriesForUnknown, loadExistingMerchants };",
   );
@@ -130,6 +131,7 @@ function loadFunctions() {
     TAB_MERCHANT_RULES,
     TAB_CATEGORIES,
     { log: () => {} }, // silent console
+    { log: () => {} }, // Logger mock
   );
 }
 

@@ -124,6 +124,7 @@ const HEADERS_RECEIPT_FILES = [
   "file_name",
   "imported_at",
   "status",
+  "retry_count",
   "detected_date",
   "detected_merchant",
   "detected_amount",
@@ -167,6 +168,7 @@ const STATUS_NEEDS_RULE = "NEEDS_RULE";
 const STATUS_APPROVED = "APPROVED";
 const STATUS_PROCESSED = "PROCESSED";
 const STATUS_ERROR = "ERROR";
+const STATUS_FAILED_PERMANENTLY = "FAILED_PERMANENTLY";
 const STATUS_SKIPPED = "SKIPPED";
 
 // Mode constants
@@ -203,6 +205,7 @@ if (typeof module !== "undefined" && module.exports) {
     STATUS_NEEDS_RULE,
     STATUS_APPROVED,
     STATUS_PROCESSED,
+    STATUS_FAILED_PERMANENTLY,
     STATUS_ERROR,
     STATUS_SKIPPED,
     MODE_AUTO,

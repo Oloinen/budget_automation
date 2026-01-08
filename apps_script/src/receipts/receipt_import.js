@@ -20,6 +20,7 @@
 // Helpers used from utils.js: findBestRule, normaliseForMatch, readColumnValues, makeTxId, loadRules, toIso, toMonth, truncate
 
 const RAW_TEXT_MAX_LENGTH = 45000; // Maximum length for raw OCR text in staging sheets
+const MAX_RETRIES = 3;
 
 /**
  * Entry point: processes unprocessed files in the folder.
@@ -36,8 +37,22 @@ function importReceiptsFromFolder() {
 
   const rules = loadRules(sheets.rulesSheet, "pattern");
 
-  // Idempotency: load existing file_ids to avoid reprocessing
-  const existingFileIds = new Set(readColumnValues(sheets.filesSheet, "file_id").filter(Boolean));
+  // Idempotency + retry tracking: load existing file rows to allow retries
+  const filesColMap = getHeaders(sheets.filesSheet);
+  const colCount = Math.max(...Object.values(filesColMap));
+
+  const existingFilesMap = new Map();
+  const lastFilesRow = sheets.filesSheet.getLastRow();
+  if (lastFilesRow >= 2) {
+    const rows = sheets.filesSheet.getRange(2, 1, lastFilesRow - 1, colCount).getValues();
+    rows.forEach((row, i) => {
+      const fid = String(row[(filesColMap["file_id"] || 0) - 1] || "").trim();
+      if (!fid) return;
+      const status = String(row[(filesColMap["status"] || 0) - 1] || "").trim();
+      const retry = Number(row[(filesColMap["retry_count"] || 0) - 1] || 0);
+      existingFilesMap.set(fid, { rowNumber: i + 2, status, retry });
+    });
+  }
 
   // Load unknown items index for batch upsert
   const unknownItemsMap = getHeaders(sheets.unknownSheet);
@@ -73,10 +88,23 @@ function importReceiptsFromFolder() {
       continue;
     }
 
-    // Skip already processed files (idempotency check)
+    // Skip already processed files (idempotency and retry logic)
     const fileId = file.getId();
-    if (existingFileIds.has(fileId)) {
-      continue;
+    const existing = existingFilesMap.get(fileId);
+    if (existing) {
+      if (existing.status === STATUS_PROCESSED) {
+        continue;
+      }
+      if (existing.retry >= MAX_RETRIES) {
+        // Mark permanently failed if not already
+        if (existing.status !== STATUS_FAILED_PERMANENTLY) {
+          sheets.filesSheet.getRange(existing.rowNumber, filesColMap["status"]).setValue(
+            STATUS_FAILED_PERMANENTLY,
+          );
+        }
+        continue;
+      }
+      // else: allow reprocessing (will increment retry_count on failure)
     }
 
     processed++;
@@ -95,19 +123,25 @@ function importReceiptsFromFolder() {
       const detectedAmount = result.total ?? "";
       const items = Array.isArray(result.items) ? result.items : [];
 
-      // Write receipt_files row (one per file)
-      appendRow(sheets.filesSheet, [
-        receiptId,
-        fileId,
-        name,
-        importedAtIso,
-        STATUS_PROCESSED,
-        detectedDate,
-        detectedMerchant,
-        detectedAmount,
-        false,
-        "",
-      ]);
+      // Write or update receipt_files row (one per file)
+      const fileRow = new Array(colCount).fill("");
+      fileRow[(filesColMap["receipt_id"] || 0) - 1] = receiptId;
+      fileRow[(filesColMap["file_id"] || 0) - 1] = fileId;
+      fileRow[(filesColMap["file_name"] || 0) - 1] = name;
+      fileRow[(filesColMap["imported_at"] || 0) - 1] = importedAtIso;
+      fileRow[(filesColMap["status"] || 0) - 1] = STATUS_PROCESSED;
+      fileRow[(filesColMap["retry_count"] || 0) - 1] = existing ? existing.retry : 0;
+      fileRow[(filesColMap["detected_date"] || 0) - 1] = detectedDate;
+      fileRow[(filesColMap["detected_merchant"] || 0) - 1] = detectedMerchant;
+      fileRow[(filesColMap["detected_amount"] || 0) - 1] = detectedAmount;
+      fileRow[(filesColMap["is_verified"] || 0) - 1] = false;
+      fileRow[(filesColMap["note"] || 0) - 1] = "";
+
+      if (existing) {
+        sheets.filesSheet.getRange(existing.rowNumber, 1, 1, colCount).setValues([fileRow]);
+      } else {
+        appendRow(sheets.filesSheet, fileRow);
+      }
 
       // Process each item: match rules and categorize
       processReceiptItems(
@@ -122,19 +156,47 @@ function importReceiptsFromFolder() {
         unknownItemsIdx,
       );
     } catch (err) {
-      // Write receipt_files row with error status
-      appendRow(sheets.filesSheet, [
-        `r_${fileId}`,
-        fileId,
-        name,
-        importedAtIso,
-        STATUS_ERROR,
-        "",
-        "",
-        "",
-        false,
-        String(err && err.message ? err.message : err),
-      ]);
+      // Write or update receipt_files row with error status and increment retry_count
+      try {
+        const prev = existingFilesMap.get(fileId);
+        const prevRetry = prev ? Number(prev.retry || 0) : 0;
+        const newRetry = prevRetry + 1;
+        const status = newRetry >= MAX_RETRIES ? STATUS_FAILED_PERMANENTLY : STATUS_ERROR;
+
+        const errRow = new Array(colCount).fill("");
+        errRow[(filesColMap["receipt_id"] || 0) - 1] = `r_${fileId}`;
+        errRow[(filesColMap["file_id"] || 0) - 1] = fileId;
+        errRow[(filesColMap["file_name"] || 0) - 1] = name;
+        errRow[(filesColMap["imported_at"] || 0) - 1] = importedAtIso;
+        errRow[(filesColMap["status"] || 0) - 1] = status;
+        errRow[(filesColMap["retry_count"] || 0) - 1] = newRetry;
+        errRow[(filesColMap["detected_date"] || 0) - 1] = "";
+        errRow[(filesColMap["detected_merchant"] || 0) - 1] = "";
+        errRow[(filesColMap["detected_amount"] || 0) - 1] = "";
+        errRow[(filesColMap["is_verified"] || 0) - 1] = false;
+        errRow[(filesColMap["note"] || 0) - 1] = String(err && err.message ? err.message : err);
+
+        if (prev) {
+          sheets.filesSheet.getRange(prev.rowNumber, 1, 1, colCount).setValues([errRow]);
+        } else {
+          appendRow(sheets.filesSheet, errRow);
+        }
+      } catch (e) {
+        // best-effort: if updating the existing row fails, append fallback
+        appendRow(sheets.filesSheet, [
+          `r_${fileId}`,
+          fileId,
+          name,
+          importedAtIso,
+          STATUS_ERROR,
+          1,
+          "",
+          "",
+          "",
+          false,
+          String(err && err.message ? err.message : err),
+        ]);
+      }
     }
   }
 

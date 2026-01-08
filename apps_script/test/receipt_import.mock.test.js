@@ -34,7 +34,7 @@ describe("Receipt Import - Full Flow (Mock)", () => {
       const isPdf = mt === "application/pdf";
       const isImage =
         mt.startsWith("image/") &&
-        (/\.(jpe?g|png)$/i.test(name) || mt.includes("jpeg") || mt.includes("png"));
+        (/\.(jpe?g|png)$/i.test(_name) || mt.includes("jpeg") || mt.includes("png"));
 
       if (isPdf || isImage) {
         supportedCount++;

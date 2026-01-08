@@ -105,6 +105,7 @@ function loadFunctions() {
     "TAB_ITEM_RULES",
     "TAB_CATEGORIES",
     "console",
+    "Logger",
     approvalCode +
       "\nreturn { approveUnknownItems, loadValidCategoriesForUnknown, loadExistingPatterns };",
   );
@@ -122,6 +123,7 @@ function loadFunctions() {
     TAB_ITEM_RULES,
     TAB_CATEGORIES,
     { log: () => {} }, // silent console
+    { log: () => {} }, // Logger mock
   );
 }
 
