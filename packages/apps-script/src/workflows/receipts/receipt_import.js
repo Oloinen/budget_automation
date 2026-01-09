@@ -1,0 +1,539 @@
+/* exported importReceiptsFromFolder */
+
+// Import utilities from organized core modules
+const { getHeaders, readColumnValues, appendRows } = require("../../core/sheets/operations");
+const { loadRules, findBestRule } = require("../../core/sheets/rules");
+const { normaliseForMatch } = require("../../core/parsers/data");
+const { makeTxId } = require("../../core/parsers/id");
+const { toIso, toMonth, truncate } = require("../../core/utilities");
+const { loadUnknownsIndex, upsertUnknown, flushUnknowns } = require("../../core/unknowns");
+
+/**
+ * Receipt importer (Apps Script)
+ *
+ * What it does:
+ * - scans a Drive folder for files (chunked so it can handle many files across multiple runs)
+ * - calls Cloud Function receipt-extractor to extract text and parse receipts
+ *   - handles both PDFs and images (JPG/PNG)
+ *   - returns merchant, date, total, and line items
+ * - matches items against item_rules
+ *   - matched -> transactions_ready
+ *   - unmatched -> receipt_staging + unknown_items
+ * - writes one row per processed file to receipt_files
+ *
+ * Requirements:
+ * - Cloud Function receipt-extractor must be deployed and accessible
+ * - Apps Script must have permission to call the Cloud Function (uses ScriptApp.getIdentityToken())
+ */
+
+const RAW_TEXT_MAX_LENGTH = 45000; // Maximum length for raw OCR text in staging sheets
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000; // Initial delay between retries (exponential backoff)
+const REQUEST_TIMEOUT_MS = 50000; // 50 seconds timeout for Cloud Function calls
+const { getReceiptsFolderId, getReceiptExtractorUrl, schema } = require("../../core/runtime-ids");
+
+/**
+ * Entry point: processes unprocessed files in the folder.
+ * Safe to run multiple times - skips already processed files (idempotent).
+ * Time budget protects against Apps Script execution limits.
+ *
+ * @param {Object} deps - Dependencies object for testability
+ * @param {Object} deps.SpreadsheetApp - Apps Script SpreadsheetApp API
+ * @param {Object} deps.DriveApp - Apps Script DriveApp API
+ * @param {Object} deps.ScriptApp - Apps Script ScriptApp API (for identity token)
+ * @param {Object} deps.UrlFetchApp - Apps Script UrlFetchApp API
+ * @param {Object} deps.Logger - Apps Script Logger API
+ * @param {Function} deps.getReceiptsFolderId - Function to get receipts folder ID
+ * @param {Function} deps.getReceiptExtractorUrl - Function to get extractor URL
+ * @param {Object} deps.schema - Schema constants
+ * @param {Function} [deps.checkApiQuota] - Optional quota check function
+ */
+function _importReceiptsFromFolder(deps) {
+  // Extract dependencies with fallbacks for backwards compatibility
+  const SpreadsheetApp = deps?.SpreadsheetApp || globalThis.SpreadsheetApp;
+  const DriveApp = deps?.DriveApp || globalThis.DriveApp;
+  const ScriptApp = deps?.ScriptApp || globalThis.ScriptApp;
+  const UrlFetchApp = deps?.UrlFetchApp || globalThis.UrlFetchApp;
+  const Logger = deps?.Logger || globalThis.Logger;
+  const getReceiptsFolderId = deps?.getReceiptsFolderId || (() => globalThis.RECEIPTS_FOLDER_ID);
+  const getReceiptExtractorUrl =
+    deps?.getReceiptExtractorUrl || (() => globalThis.RECEIPT_EXTRACTOR_URL);
+  const schema = deps?.schema || require("../../../../shared/schema");
+  const checkApiQuota = deps?.checkApiQuota || globalThis.checkApiQuota;
+
+  const FOLDER_ID =
+    typeof getReceiptsFolderId === "function"
+      ? getReceiptsFolderId()
+      : typeof RECEIPTS_FOLDER_ID !== "undefined"
+      ? RECEIPTS_FOLDER_ID
+      : undefined;
+  const maxFilesPerRun = 40; // keep modest for Apps Script time limits
+  const timeBudgetMs = 5.3 * 60 * 1000; // ~5.3 minutes safety
+
+  const ss = SpreadsheetApp.getActive();
+  // Guard against hitting API quotas
+  try {
+    if (typeof checkApiQuota === "function") checkApiQuota();
+  } catch (e) {
+    const { createQuotaError } = require("../../core/error_handler");
+    throw createQuotaError("receipt import", e);
+  }
+  const sheets = ensureSheets(ss);
+
+  const rules = loadRules(sheets.rulesSheet, "pattern");
+
+  // Idempotency + retry tracking: load existing file rows to allow retries
+  const filesColMap = getHeaders(sheets.filesSheet);
+  const colCount = Math.max(...Object.values(filesColMap));
+
+  const existingFilesMap = new Map();
+  const lastFilesRow = sheets.filesSheet.getLastRow();
+  if (lastFilesRow >= 2) {
+    const rows = sheets.filesSheet.getRange(2, 1, lastFilesRow - 1, colCount).getValues();
+    rows.forEach((row, i) => {
+      const fid = String(row[(filesColMap["file_id"] || 0) - 1] || "").trim();
+      if (!fid) return;
+      const status = String(row[(filesColMap["status"] || 0) - 1] || "").trim();
+      const retry = Number(row[(filesColMap["retry_count"] || 0) - 1] || 0);
+      existingFilesMap.set(fid, { rowNumber: i + 2, status, retry });
+    });
+  }
+
+  // Load unknown items index for batch upsert
+  const unknownItemsMap = getHeaders(sheets.unknownSheet);
+  const unknownItemsIdx = loadUnknownItemsIndex(sheets.unknownSheet, unknownItemsMap);
+
+  const folder = DriveApp.getFolderById(FOLDER_ID);
+
+  // Collect file handles in a stable, deterministic order
+  const filesArr = [];
+  const it = folder.getFiles();
+  while (it.hasNext()) filesArr.push(it.next());
+  filesArr.sort((a, b) => (a.getName() || "").localeCompare(b.getName() || ""));
+
+  const start = Date.now();
+  let processed = 0;
+
+  for (const file of filesArr) {
+    // time budget guard
+    if (Date.now() - start > timeBudgetMs) break;
+    if (processed >= maxFilesPerRun) break;
+
+    const name = file.getName() || "";
+
+    // Skip non-supported types quickly
+    const mt = file.getMimeType() || "";
+    const isPdf = mt === "application/pdf";
+    const isImage =
+      mt.startsWith("image/") &&
+      (/\.(jpe?g|png)$/i.test(name) || mt.includes("jpeg") || mt.includes("png"));
+
+    if (!isPdf && !isImage) {
+      // ignore other files
+      continue;
+    }
+
+    // Skip already processed files (idempotency and retry logic)
+    const fileId = file.getId();
+    const existing = existingFilesMap.get(fileId);
+    if (existing) {
+      if (existing.status === schema.STATUS_PROCESSED) {
+        continue;
+      }
+      if (existing.retry >= MAX_RETRIES) {
+        // Mark permanently failed if not already
+        if (existing.status !== schema.STATUS_FAILED_PERMANENTLY) {
+          sheets.filesSheet
+            .getRange(existing.rowNumber, filesColMap["status"])
+            .setValue(schema.STATUS_FAILED_PERMANENTLY);
+        }
+        continue;
+      }
+      // else: allow reprocessing (will increment retry_count on failure)
+    }
+
+    processed++;
+
+    const receiptId = `r_${fileId}`;
+    const importedAt = new Date();
+    const importedAtIso = toIso(importedAt);
+
+    try {
+      // Call Cloud Function to extract and parse receipt
+      const result = callReceiptExtractor(fileId);
+
+      const rawText = result.raw_text || "";
+      const detectedDate = result.date || "";
+      const detectedMerchant = result.merchant || "";
+      const detectedAmount = result.total ?? "";
+      const items = Array.isArray(result.items) ? result.items : [];
+
+      // Write or update receipt_files row (one per file)
+      const fileRow = new Array(colCount).fill("");
+      fileRow[(filesColMap["receipt_id"] || 0) - 1] = receiptId;
+      fileRow[(filesColMap["file_id"] || 0) - 1] = fileId;
+      fileRow[(filesColMap["file_name"] || 0) - 1] = name;
+      fileRow[(filesColMap["imported_at"] || 0) - 1] = importedAtIso;
+      fileRow[(filesColMap["status"] || 0) - 1] = schema.STATUS_PROCESSED;
+      fileRow[(filesColMap["retry_count"] || 0) - 1] = existing ? existing.retry : 0;
+      fileRow[(filesColMap["detected_date"] || 0) - 1] = detectedDate;
+      fileRow[(filesColMap["detected_merchant"] || 0) - 1] = detectedMerchant;
+      fileRow[(filesColMap["detected_amount"] || 0) - 1] = detectedAmount;
+      fileRow[(filesColMap["is_verified"] || 0) - 1] = false;
+      fileRow[(filesColMap["note"] || 0) - 1] = "";
+
+      if (existing) {
+        sheets.filesSheet.getRange(existing.rowNumber, 1, 1, colCount).setValues([fileRow]);
+      } else {
+        appendRow(sheets.filesSheet, fileRow);
+      }
+
+      // Process each item: match rules and categorize
+      processReceiptItems(
+        sheets,
+        items,
+        detectedDate,
+        detectedMerchant,
+        receiptId,
+        rawText,
+        importedAtIso,
+        rules,
+        unknownItemsIdx,
+      );
+    } catch (err) {
+      // Write or update receipt_files row with error status and increment retry_count
+      try {
+        const prev = existingFilesMap.get(fileId);
+        const prevRetry = prev ? Number(prev.retry || 0) : 0;
+        const newRetry = prevRetry + 1;
+        const status =
+          newRetry >= MAX_RETRIES ? schema.STATUS_FAILED_PERMANENTLY : schema.STATUS_ERROR;
+
+        const errRow = new Array(colCount).fill("");
+        errRow[(filesColMap["receipt_id"] || 0) - 1] = `r_${fileId}`;
+        errRow[(filesColMap["file_id"] || 0) - 1] = fileId;
+        errRow[(filesColMap["file_name"] || 0) - 1] = name;
+        errRow[(filesColMap["imported_at"] || 0) - 1] = importedAtIso;
+        errRow[(filesColMap["status"] || 0) - 1] = status;
+        errRow[(filesColMap["retry_count"] || 0) - 1] = newRetry;
+        errRow[(filesColMap["detected_date"] || 0) - 1] = "";
+        errRow[(filesColMap["detected_merchant"] || 0) - 1] = "";
+        errRow[(filesColMap["detected_amount"] || 0) - 1] = "";
+        errRow[(filesColMap["is_verified"] || 0) - 1] = false;
+        errRow[(filesColMap["note"] || 0) - 1] = String(err && err.message ? err.message : err);
+
+        if (prev) {
+          sheets.filesSheet.getRange(prev.rowNumber, 1, 1, colCount).setValues([errRow]);
+        } else {
+          appendRow(sheets.filesSheet, errRow);
+        }
+      } catch (e) {
+        // best-effort: if updating the existing row fails, append fallback
+        appendRow(sheets.filesSheet, [
+          `r_${fileId}`,
+          fileId,
+          name,
+          importedAtIso,
+          schema.STATUS_ERROR,
+          1,
+          "",
+          "",
+          "",
+          false,
+          String(err && err.message ? err.message : err),
+        ]);
+      }
+    }
+
+    // Flush unknown items index (batch write)
+    flushUnknownItems(sheets.unknownSheet, unknownItemsMap, unknownItemsIdx);
+
+    if (Logger && Logger.log) {
+      Logger.log(`Processed ${processed} files this run.`);
+    }
+  }
+
+  return { success: true, processed, skipped: alreadyProcessed.length };
+}
+
+/**
+ * Public entrypoint for Apps Script - creates deps object from globals.
+ * Can be called with explicit deps for testing: importReceiptsFromFolder(deps)
+ */
+function importReceiptsFromFolder(deps) {
+  try {
+    // If no deps provided, create from globals (Apps Script runtime)
+    if (!deps) {
+      const runtimeIds = require("../../core/runtime-ids");
+      deps = {
+        SpreadsheetApp: globalThis.SpreadsheetApp,
+        DriveApp: globalThis.DriveApp,
+        ScriptApp: globalThis.ScriptApp,
+        UrlFetchApp: globalThis.UrlFetchApp,
+        Logger: globalThis.Logger,
+        getReceiptsFolderId: runtimeIds.getReceiptsFolderId,
+        getReceiptExtractorUrl: runtimeIds.getReceiptExtractorUrl,
+        schema: runtimeIds.schema,
+        checkApiQuota: globalThis.checkApiQuota,
+      };
+    }
+
+    const res = _importReceiptsFromFolder(deps);
+    if (res && typeof res === "object" && "success" in res) return res;
+    return { success: true };
+  } catch (err) {
+    var errs = require("../../core/errors");
+    try {
+      var notifs = require("../../core/notification_utils");
+      try {
+        notifs.notifyImportFailure("ReceiptImport", err && err.message ? err.message : String(err));
+      } catch (e) {
+        void e;
+      }
+    } catch (e) {
+      void e;
+    }
+    if (err instanceof errs.WorkflowError) return errs.toResponse(err);
+    return errs.toResponse(
+      new errs.WorkflowError(String(err), "EXECUTION_ERROR", { original: err }),
+    );
+  }
+}
+
+/* ---------------------------
+ * Process receipt items
+ * --------------------------- */
+function processReceiptItems(
+  sheets,
+  items,
+  detectedDate,
+  detectedMerchant,
+  receiptId,
+  rawText,
+  importedAtIso,
+  rules,
+  unknownItemsIdx,
+) {
+  for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
+    const item = items[itemIdx];
+    const itemName = String(item?.name || "").trim();
+    const itemAmount = item?.amount ?? item?.price ?? "";
+
+    if (!itemName) continue;
+
+    const match = findBestRule(normaliseForMatch(itemName), rules);
+
+    if (match) {
+      const txId = makeTxId(`${detectedDate}|${itemName}|${itemAmount}|${receiptId}|${itemIdx}`);
+      const month = toMonth(detectedDate);
+
+      // Check mode: 'review' goes to staging, 'auto' goes to ready
+      if (match.mode === schema.MODE_REVIEW) {
+        // matched but needs review -> receipt_staging
+        appendRow(sheets.stagingSheet, [
+          txId,
+          detectedDate,
+          receiptId,
+          detectedMerchant,
+          itemAmount,
+          match.group,
+          match.category,
+          importedAtIso,
+          schema.STATUS_NEEDS_REVIEW,
+          truncate(rawText, RAW_TEXT_MAX_LENGTH),
+        ]);
+      } else {
+        // matched with auto mode -> transactions_ready
+        appendRow(sheets.readySheet, [
+          txId,
+          detectedDate,
+          month,
+          detectedMerchant,
+          itemAmount,
+          match.group,
+          match.category,
+          importedAtIso,
+          `receipt:${receiptId}`,
+        ]);
+      }
+    } else {
+      // unmatched -> receipt_staging + unknown_items
+      const txId = makeTxId(`${detectedDate}|${itemName}|${itemAmount}|${receiptId}|${itemIdx}`);
+      appendRow(sheets.stagingSheet, [
+        txId,
+        detectedDate,
+        receiptId,
+        detectedMerchant,
+        itemAmount,
+        "",
+        "",
+        importedAtIso,
+        schema.STATUS_NEEDS_RULE,
+        truncate(rawText, RAW_TEXT_MAX_LENGTH),
+      ]);
+
+      // Upsert to unknown items index (batch update)
+      const itemKey = normaliseForMatch(itemName);
+      upsertUnknownItem(unknownItemsIdx, itemKey, itemName, detectedDate);
+    }
+  }
+}
+
+/* ---------------------------
+ * Call Cloud Function receipt-extractor
+ * --------------------------- */
+/**
+ * Call the receipt-extractor Cloud Function with retry logic and timeout handling.
+ * @param {string} fileId - Google Drive file ID
+ * @param {number} retryCount - Current retry attempt (0-indexed)
+ * @returns {object} Parsed receipt result from Cloud Function
+ * @throws {Error} If all retries fail or response is invalid
+ */
+function callReceiptExtractor(fileId, retryCount = 0) {
+  const url =
+    typeof getReceiptExtractorUrl === "function"
+      ? getReceiptExtractorUrl()
+      : typeof RECEIPT_EXTRACTOR_URL !== "undefined"
+      ? RECEIPT_EXTRACTOR_URL
+      : undefined;
+
+  if (!url) {
+    throw new Error("Receipt extractor URL not configured");
+  }
+
+  // Get identity token for authentication
+  const token = ScriptApp.getIdentityToken();
+
+  const payload = { fileId };
+
+  try {
+    const res = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+      // Apps Script doesn't support explicit timeout, but we track elapsed time
+    });
+
+    const code = res.getResponseCode();
+    const body = res.getContentText();
+
+    // Retry on server errors or rate limits
+    if (code >= 500 || code === 429) {
+      if (retryCount < MAX_RETRIES - 1) {
+        const delay = RETRY_DELAY_MS * Math.pow(2, retryCount); // Exponential backoff
+        Logger.log(
+          `Receipt extractor HTTP ${code}, retrying in ${delay}ms (attempt ${
+            retryCount + 1
+          }/${MAX_RETRIES})`,
+        );
+        Utilities.sleep(delay);
+        return callReceiptExtractor(fileId, retryCount + 1);
+      }
+      throw new Error(
+        `Receipt extractor error HTTP ${code} after ${MAX_RETRIES} retries: ${body.substring(
+          0,
+          1000,
+        )}`,
+      );
+    }
+
+    if (code < 200 || code >= 300) {
+      throw new Error(`Receipt extractor error HTTP ${code}: ${body.substring(0, 1000)}`);
+    }
+
+    const json = JSON.parse(body);
+
+    // Validate response structure
+    if (!json || typeof json !== "object") {
+      throw new Error("Receipt extractor returned invalid JSON response");
+    }
+
+    if (!json.ok) {
+      throw new Error(`Receipt extractor returned error: ${json.error || "unknown error"}`);
+    }
+
+    // Validate result structure
+    const result = json.result;
+    if (!result || typeof result !== "object") {
+      throw new Error("Receipt extractor result is missing or invalid");
+    }
+
+    // Ensure items is an array (allow empty array)
+    if (result.items !== undefined && !Array.isArray(result.items)) {
+      Logger.log("Warning: items field is not an array, coercing to empty array");
+      result.items = [];
+    }
+
+    return result;
+  } catch (err) {
+    // Retry on transient errors (network issues, timeouts)
+    const isRetriable =
+      err.message &&
+      (err.message.includes("timeout") ||
+        err.message.includes("network") ||
+        err.message.includes("connection"));
+
+    if (isRetriable && retryCount < MAX_RETRIES - 1) {
+      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount);
+      Logger.log(
+        `Receipt extractor transient error, retrying in ${delay}ms (attempt ${
+          retryCount + 1
+        }/${MAX_RETRIES}): ${err.message}`,
+      );
+      Utilities.sleep(delay);
+      return callReceiptExtractor(fileId, retryCount + 1);
+    }
+
+    throw err;
+  }
+}
+
+/* Removed: upsertUnknownItem - now using shared unknowns_utils.js */
+
+/* ---------------------------
+ * Sheet helpers
+ * --------------------------- */
+function ensureSheets(ss) {
+  const readySheet = getOrCreateSheet(
+    ss,
+    schema.TAB_TRANSACTIONS_READY,
+    schema.HEADERS_TRANSACTIONS_READY,
+  );
+  const stagingSheet = getOrCreateSheet(
+    ss,
+    schema.TAB_RECEIPT_STAGING,
+    schema.HEADERS_RECEIPT_STAGING,
+  );
+  const filesSheet = getOrCreateSheet(ss, schema.TAB_RECEIPT_FILES, schema.HEADERS_RECEIPT_FILES);
+  const rulesSheet = getOrCreateSheet(ss, schema.TAB_ITEM_RULES, schema.HEADERS_ITEM_RULES);
+  const unknownSheet = getOrCreateSheet(ss, schema.TAB_UNKNOWN_ITEMS, schema.HEADERS_UNKNOWN_ITEMS);
+
+  return { readySheet, stagingSheet, filesSheet, rulesSheet, unknownSheet };
+}
+
+function getOrCreateSheet(ss, name, headers) {
+  let sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+
+  ensureHeaders(sh, headers);
+  return sh;
+}
+
+function ensureHeaders(sh, headers) {
+  const range = sh.getRange(1, 1, 1, headers.length);
+  const existing = range.getValues()[0].map(String);
+
+  const same = headers.every((h, i) => (existing[i] || "") === h);
+  if (!same) {
+    range.setValues([headers]);
+    sh.setFrozenRows(1);
+  }
+}
+
+function appendRow(sh, row) {
+  sh.appendRow(row);
+}

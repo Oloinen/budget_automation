@@ -1,0 +1,160 @@
+/**
+ * Shared schema/constants used across Apps Script and server code.
+ * Exported as plain values to be consumed by `require()`.
+ */
+
+// CSV columns (must match header row exactly)
+const CSV_COL_DATE = "Date of payment";
+const CSV_COL_MERCHANT = "Location of purchase";
+const CSV_COL_AMOUNT = "Transaction amount";
+
+// Credit card tab names
+const TAB_MERCHANT_RULES = "merchant_rules";
+const TAB_CC_STAGING = "credit_card_staging";
+const TAB_CC_SKIPPED = "credit_card_skipped";
+const TAB_MERCHANTS_UNKNOWN = "unknown_merchants";
+
+// Receipt-related tabs
+const TAB_RECEIPT_STAGING = "receipt_staging";
+const TAB_RECEIPT_FILES = "receipt_files";
+const TAB_ITEM_RULES = "item_rules";
+const TAB_UNKNOWN_ITEMS = "unknown_items";
+
+// Shared tabs
+const TAB_TRANSACTIONS_READY = "transactions_ready";
+const TAB_CATEGORIES = "categories";
+
+// Header arrays
+const HEADERS_TRANSACTIONS_READY = [
+  "tx_id",
+  "date",
+  "month",
+  "merchant",
+  "amount",
+  "group",
+  "category",
+  "posted_at",
+  "source",
+];
+const HEADERS_CC_STAGING = [
+  "tx_id",
+  "date",
+  "merchant",
+  "amount",
+  "rule_mode",
+  "group",
+  "category",
+  "posted_at",
+  "status",
+];
+const HEADERS_UNKNOWN_MERCHANTS = [
+  "merchant",
+  "group",
+  "category",
+  "mode",
+  "count",
+  "first_seen",
+  "last_seen",
+  "status",
+];
+const HEADERS_MERCHANT_RULES = ["merchant", "group", "category", "mode"];
+const HEADERS_CC_SKIPPED = [
+  "tx_id",
+  "date",
+  "merchant",
+  "amount",
+  "receipt_id",
+  "status",
+  "completed_at",
+];
+const HEADERS_RECEIPT_STAGING = [
+  "tx_id",
+  "date",
+  "receipt_id",
+  "merchant",
+  "amount",
+  "group",
+  "category",
+  "posted_at",
+  "status",
+  "raw_ocr",
+];
+const HEADERS_RECEIPT_FILES = [
+  "receipt_id",
+  "file_id",
+  "file_name",
+  "imported_at",
+  "status",
+  "retry_count",
+  "detected_date",
+  "detected_merchant",
+  "detected_amount",
+  "is_verified",
+  "note",
+];
+const HEADERS_ITEM_RULES = ["pattern", "group", "category", "mode"];
+const HEADERS_UNKNOWN_ITEMS = [
+  "pattern",
+  "group",
+  "category",
+  "mode",
+  "count",
+  "first_seen",
+  "last_seen",
+  "status",
+];
+const HEADERS_CATEGORIES = ["group", "category", "subcategory", "active"];
+
+// Status constants
+const STATUS_NEEDS_REVIEW = "NEEDS_REVIEW";
+const STATUS_NEEDS_RULE = "NEEDS_RULE";
+const STATUS_APPROVED = "APPROVED";
+const STATUS_PROCESSED = "PROCESSED";
+const STATUS_ERROR = "ERROR";
+const STATUS_FAILED_PERMANENTLY = "FAILED_PERMANENTLY";
+const STATUS_SKIPPED = "SKIPPED";
+
+// Mode constants
+const MODE_AUTO = "auto";
+const MODE_REVIEW = "review";
+const MODE_SKIP = "skip";
+
+// How to pick which CSV to read:
+const READ_ONLY_LATEST_CSV = true; // set false to process all CSVs in folder
+
+module.exports = {
+  CSV_COL_DATE,
+  CSV_COL_MERCHANT,
+  CSV_COL_AMOUNT,
+  TAB_MERCHANT_RULES,
+  TAB_CC_STAGING,
+  TAB_CC_SKIPPED,
+  TAB_MERCHANTS_UNKNOWN,
+  TAB_RECEIPT_STAGING,
+  TAB_RECEIPT_FILES,
+  TAB_ITEM_RULES,
+  TAB_UNKNOWN_ITEMS,
+  TAB_TRANSACTIONS_READY,
+  TAB_CATEGORIES,
+  HEADERS_TRANSACTIONS_READY,
+  HEADERS_CC_STAGING,
+  HEADERS_UNKNOWN_MERCHANTS,
+  HEADERS_MERCHANT_RULES,
+  HEADERS_CC_SKIPPED,
+  HEADERS_RECEIPT_STAGING,
+  HEADERS_RECEIPT_FILES,
+  HEADERS_ITEM_RULES,
+  HEADERS_UNKNOWN_ITEMS,
+  HEADERS_CATEGORIES,
+  STATUS_NEEDS_REVIEW,
+  STATUS_NEEDS_RULE,
+  STATUS_APPROVED,
+  STATUS_PROCESSED,
+  STATUS_ERROR,
+  STATUS_FAILED_PERMANENTLY,
+  STATUS_SKIPPED,
+  MODE_AUTO,
+  MODE_REVIEW,
+  MODE_SKIP,
+  READ_ONLY_LATEST_CSV,
+};

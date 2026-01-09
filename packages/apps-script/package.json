@@ -5,8 +5,8 @@
   "scripts": {
     "test": "jest",
     "test:unit": "jest",
-    "test:e2e": "node apps_script/test/e2e/run_full_e2e.js",
-    "test:e2e:keep": "SKIP_CLEANUP=true node apps_script/test/e2e/run_full_e2e.js"
+    "test:e2e": "node test/e2e/runners/run_full_e2e.js",
+    "test:e2e:keep": "SKIP_CLEANUP=true node test/e2e/runners/run_full_e2e.js"
   },
   "devDependencies": {
     "eslint": "^8.0.0",
@@ -18,7 +18,7 @@
     "prettier": "^2.8.8"
   },
   "lint-staged": {
-    "apps_script/**/*.js": [
+    "src/**/*.js": [
       "eslint --fix",
       "prettier --write"
     ]

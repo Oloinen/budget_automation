@@ -1,0 +1,27 @@
+{
+  "basic": [
+    ["maito", "Food", "Groceries", "auto"],
+    ["leipä", "Food", "Groceries", "auto"],
+    ["juusto", "Food", "Groceries", "auto"]
+  ],
+  "comprehensive": [
+    ["maito", "Food", "Groceries", "auto"],
+    ["leipä", "Food", "Groceries", "auto"],
+    ["juusto", "Food", "Groceries", "auto"],
+    ["banaani", "Food", "Groceries", "auto"],
+    ["appelsiini", "Food", "Groceries", "auto"],
+    ["vessapaperi", "Household", "Essentials", "auto"],
+    ["coca-cola", "Food", "Extra foods", "auto"],
+    ["fanta", "Food", "Extra foods", "auto"]
+  ],
+  "withModes": [
+    ["maito", "Food", "Groceries", "auto"],
+    ["juusto", "Food", "Groceries", "review"],
+    ["coca", "Food", "Extra foods", "auto"]
+  ],
+  "withReview": [
+    ["maito", "Food", "Groceries", "review"],
+    ["leipä", "Food", "Groceries", "auto"]
+  ],
+  "empty": []
+}

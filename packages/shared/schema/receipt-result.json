@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/receipt_result.json",
+  "title": "ReceiptExtractionResult",
+  "type": "object",
+  "required": [
+    "receipt_id",
+    "source",
+    "extracted_at",
+    "merchant",
+    "date",
+    "total",
+    "items",
+    "raw_text"
+  ],
+  "properties": {
+    "receipt_id": {
+      "type": "string",
+      "description": "Unique ID generated for this receipt (UUID)."
+    },
+
+    "source": {
+      "type": "object",
+      "required": ["file_id", "file_name", "mime_type"],
+      "properties": {
+        "file_id": { "type": "string" },
+        "file_name": { "type": "string" },
+        "mime_type": { "type": "string" }
+      }
+    },
+
+    "extracted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO timestamp when extraction was performed."
+    },
+
+    "merchant": {
+      "type": "string",
+      "description": "Detected merchant name."
+    },
+
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Receipt date in YYYY-MM-DD."
+    },
+
+    "total": {
+      "type": ["number", "null"],
+      "description": "Detected total amount for the receipt."
+    },
+
+    "currency": {
+      "type": "string",
+      "default": "EUR"
+    },
+
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "amount"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Item name as printed on receipt."
+          },
+          "amount": {
+            "type": ["number", "null"],
+            "description": "Item price (null if not detected)."
+          }
+        }
+      }
+    },
+
+    "confidence": {
+      "type": "object",
+      "description": "Optional confidence indicators.",
+      "properties": {
+        "merchant": { "type": "number", "minimum": 0, "maximum": 1 },
+        "date": { "type": "number", "minimum": 0, "maximum": 1 },
+        "total": { "type": "number", "minimum": 0, "maximum": 1 },
+        "items": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+
+    "raw_text": {
+      "type": "string",
+      "description": "Full extracted text (PDF or OCR)."
+    },
+
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Non-fatal issues encountered during extraction."
+    }
+  },
+  "additionalProperties": false
+}

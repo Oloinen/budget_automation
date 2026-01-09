@@ -1,0 +1,73 @@
+{
+  "successfulResponse": {
+    "ok": true,
+    "result": {
+      "date": "2026-01-05",
+      "merchant": "K-Market",
+      "total": 15.67,
+      "items": [
+        { "name": "Maito 1L", "amount": 1.89 },
+        { "name": "Ruisleipä", "amount": 2.5 },
+        { "name": "Unknown Item", "amount": 3.99 }
+      ],
+      "raw_text": "K-Market\n05.01.2026\nMaito 1L 1.89\nRuisleipä 2.50\nUnknown Item 3.99\nYHTEENSÄ 15.67",
+      "currency": "EUR"
+    }
+  },
+  "noItemsResponse": {
+    "ok": true,
+    "result": {
+      "date": "2026-01-05",
+      "merchant": "K-Market",
+      "total": 0,
+      "items": [],
+      "raw_text": "K-Market\n05.01.2026\nYHTEENSÄ 0.00",
+      "currency": "EUR"
+    }
+  },
+  "minimalResponse": {
+    "ok": true,
+    "result": {
+      "date": "",
+      "merchant": "",
+      "total": null,
+      "items": [],
+      "raw_text": "Unable to parse receipt"
+    }
+  },
+  "errorResponse": {
+    "ok": false,
+    "error": "Failed to extract text from PDF"
+  },
+  "sMarketResponse": {
+    "ok": true,
+    "result": {
+      "date": "2026-01-06",
+      "merchant": "S-Market",
+      "total": 23.45,
+      "items": [
+        { "name": "Banaani", "amount": 1.99 },
+        { "name": "Appelsiini", "amount": 3.5 },
+        { "name": "Juusto Edam 350g", "amount": 4.99 },
+        { "name": "Vessapaperi", "amount": 6.99 }
+      ],
+      "raw_text": "S-Market\n06.01.2026\nBanaani 1.99\nAppelsiini 3.50\nJuusto Edam 350g 4.99\nVessapaperi 6.99\nYHTEENSÄ 23.45",
+      "currency": "EUR"
+    }
+  },
+  "allMatchedResponse": {
+    "ok": true,
+    "result": {
+      "date": "2026-01-07",
+      "merchant": "Lidl",
+      "total": 8.97,
+      "items": [
+        { "name": "Maito 1L", "amount": 1.89 },
+        { "name": "Leipä", "amount": 2.5 },
+        { "name": "Juusto", "amount": 4.58 }
+      ],
+      "raw_text": "Lidl\n07.01.2026\nMaito 1L 1.89\nLeipä 2.50\nJuusto 4.58\nYHTEENSÄ 8.97",
+      "currency": "EUR"
+    }
+  }
+}

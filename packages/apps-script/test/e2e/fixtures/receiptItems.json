@@ -1,0 +1,21 @@
+{
+  "matched": [
+    { "name": "Maito 1L", "amount": 1.89 },
+    { "name": "Ruisleipä", "amount": 2.5 }
+  ],
+  "unmatched": [
+    { "name": "Unknown Brand Product", "amount": 9.99 },
+    { "name": "Mystery Item", "amount": 5.49 }
+  ],
+  "mixed": [
+    { "name": "Maito 1L", "amount": 1.89 },
+    { "name": "Unknown Item", "amount": 3.99 },
+    { "name": "Juusto Edam 350g", "amount": 4.99 },
+    { "name": "Mystery Product", "amount": 2.5 }
+  ],
+  "withEmpty": [
+    { "name": "", "amount": 1.99 },
+    { "name": "   ", "amount": 2.99 },
+    { "name": "Valid Item", "amount": 3.99 }
+  ]
+}
